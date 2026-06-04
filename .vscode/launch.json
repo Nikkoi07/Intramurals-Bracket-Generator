@@ -3,6 +3,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "app",
+            "request": "launch",
+            "mainClass": "src.app",
+            "projectName": "Intramurals Bracket Generator_546af023"
+        },
+        {
+            "type": "java",
             "name": "Run JavaFX App",
             "request": "launch",
             "mainClass": "app",

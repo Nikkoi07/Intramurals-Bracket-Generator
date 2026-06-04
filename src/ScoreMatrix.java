@@ -1,3 +1,4 @@
+package src;
 public class ScoreMatrix {
     private int[][] scores; // 2D ARRAY - SCORES (TEAM A,B) = POINTS SCORED BY TEAM A AGAINST TEAM B
     private Team[] teams;

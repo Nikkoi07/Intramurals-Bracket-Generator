@@ -1,3 +1,4 @@
+package src;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -894,31 +895,51 @@ public class app extends Application {
     // =========================================================================
 
     private String getNotReadyMessage(int n, String type) {
-        if (n == 0) return "Single Elimination (4, 8, 12, 16, 24, 32) \nDouble Elimination (4, 8, 12, 16, 24, 32) \nRound Robin, Swiss System, and Free For All require at least 4 teams.";
-        if ("Single Elimination".equals(type)) {
-            if (n < 4) return "Need at least 4 Participants for Single Elimination.";
-            int[] valid = {4, 8, 12, 16, 24, 32};
-            for (int v : valid) {
-                if (n == v) return "";
-                if (v > n)  return "Add " + (v - n) + " more team(s) to reach " + v + " teams.\n(Valid: 4, 8, 12, 16, 24, 32)";
-            }
-            return "Single Elimination supports 4, 8, 12, 16, 24, or 32 teams.\nCurrent: " + n;
+    if (n == 0) return "Single Elimination (4, 8, 12, 16, 24, 32) \nDouble Elimination (4, 8, 12, 16, 24, 32) \nRound Robin, Swiss System, and Free For All require at least 4 teams.";
+    
+    if ("Single Elimination".equals(type)) {
+        if (n < 4) return "Need at least 4 Participants for Single Elimination.";
+        
+        // Custom prompts for 12 and 24 Team Play-in brackets
+        if (n > 8 && n < 12) {
+            return "Add " + (12 - n) + " more team(s) to reach 12 Team Play-in SE.\n(Valid: 4, 8, 12, 16, 24, 32)";
         }
-        if ("Double Elimination".equals(type)) {
-            if (n < 4)  return "Need at least 4 teams for Double Elimination.";
-            if (isPowerOfTwo(n) || n == 24 || n == 12) return "";
-            int[] valid = {4, 8, 12, 16, 24, 32};
-            for (int v : valid) if (v > n) return "Add " + (v - n) + " more team(s) for " + v + "-team Double Elimination.\n(Valid: 4, 8, 12, 16, 24, 32)";
-            return "Double Elimination supports 4, 8, 12, 16, 24, or 32 teams.\nCurrent: " + n;
+        if (n > 16 && n < 24) {
+            return "Add " + (24 - n) + " more team(s) to reach 24 Team Play-in SE.\n(Valid: 4, 8, 12, 16, 24, 32)";
         }
-        // Round Robin, Swiss: 4+; Free For All: 4+
-        if ("Free For All".equals(type)) {
-            if (n < 4) return "Need at least 4 teams for Free For All.";
-            return "";
+
+        int[] valid = {4, 8, 12, 16, 24, 32};
+        for (int v : valid) {
+            if (n == v) return "";
+            if (v > n)  return "Add " + (v - n) + " more team(s) to reach " + v + " teams.\n(Valid: 4, 8, 12, 16, 24, 32)";
         }
-        if (n < 4) return "Need at least 4 teams for " + type + ".";
+        return "Single Elimination supports 4, 8, 12, 16, 24, or 32 teams.\nCurrent: " + n;
+    }
+    
+    if ("Double Elimination".equals(type)) {
+        if (n < 4)  return "Need at least 4 teams for Double Elimination.";
+        
+        // Custom prompts for 12 and 24 Team Play-in brackets
+        if (n > 8 && n < 12) {
+            return "Add " + (12 - n) + " more team(s) to reach 12 Team Play-in DE.\n(Valid: 4, 8, 12, 16, 24, 32)";
+        }
+        if (n > 16 && n < 24) {
+            return "Add " + (24 - n) + " more team(s) to reach 24 Team Play-in DE.\n(Valid: 4, 8, 12, 16, 24, 32)";
+        }
+
+        if (isPowerOfTwo(n) || n == 24 || n == 12) return "";
+        int[] valid = {4, 8, 12, 16, 24, 32};
+        for (int v : valid) if (v > n) return "Add " + (v - n) + " more team(s) for " + v + "-team Double Elimination.\n(Valid: 4, 8, 12, 16, 24, 32)";
+        return "Double Elimination supports 4, 8, 12, 16, 24, or 32 teams.\nCurrent: " + n;
+    }
+    
+    if ("Free For All".equals(type)) {
+        if (n < 4) return "Need at least 4 teams for Free For All.";
         return "";
     }
+    if (n < 4) return "Need at least 4 teams for " + type + ".";
+    return "";
+}
 
     private void updateBracketView() {
     bracketView.getChildren().clear();
