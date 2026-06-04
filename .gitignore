@@ -1,0 +1,18 @@
+# VS Code - ignore everything except launch.json and settings.json
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+
+# Java compiled files
+*.class
+bin/
+target/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Temporary files
+*.tmp
+*.swp

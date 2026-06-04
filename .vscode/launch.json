@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Run JavaFX App",
+            "request": "launch",
+            "mainClass": "app",
+            "vmArgs": "--module-path \"C:/Users/james/Downloads/javafx-sdk-17.0.19/lib\" --add-modules javafx.controls,javafx.fxml"
+        }
+    ]
+}

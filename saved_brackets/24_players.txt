@@ -1,0 +1,41 @@
+BRACKET NAME: 24 players
+BRACKET TYPE: Double Elimination
+SPORT/GAME: Senate
+DESCRIPTION: 
+STATUS: PENDING
+TEAMS: 24
+----------------------------------------
+Team: Kiko | Wins: 0 | Losses: 0
+Team: Robin | Wins: 0 | Losses: 0
+Team: Bato | Wins: 0 | Losses: 0
+Team: Trillanes | Wins: 0 | Losses: 0
+Team: Daniel | Wins: 0 | Losses: 0
+Team: Dave | Wins: 0 | Losses: 0
+Team: Juan | Wins: 0 | Losses: 0
+Team: Mark | Wins: 0 | Losses: 0
+Team: Kilo | Wins: 0 | Losses: 0
+Team: John | Wins: 0 | Losses: 0
+Team: Jungkook | Wins: 0 | Losses: 0
+Team: Marvin | Wins: 0 | Losses: 0
+Team: Risa | Wins: 0 | Losses: 0
+Team: Pikachu | Wins: 0 | Losses: 0
+Team: Spongebob | Wins: 0 | Losses: 0
+Team: Patrick | Wins: 0 | Losses: 0
+Team: Naruto | Wins: 0 | Losses: 0
+Team: Luffy | Wins: 0 | Losses: 0
+Team: Justin | Wins: 0 | Losses: 0
+Team: Christian | Wins: 0 | Losses: 0
+Team: Pao | Wins: 0 | Losses: 0
+Team: Chou | Wins: 0 | Losses: 0
+Team: Selena | Wins: 0 | Losses: 0
+Team: Lancelot | Wins: 0 | Losses: 0
+----------------------------------------
+MATCH RESULTS:
+Kiko vs TBD -> Winner: Kiko (1-0)
+Mark vs TBD -> Winner: Mark (1-0)
+Trillanes vs TBD -> Winner: Trillanes (1-0)
+Daniel vs TBD -> Winner: Daniel (1-0)
+Robin vs TBD -> Winner: Robin (1-0)
+Juan vs TBD -> Winner: Juan (1-0)
+Bato vs TBD -> Winner: Bato (1-0)
+Dave vs TBD -> Winner: Dave (1-0)

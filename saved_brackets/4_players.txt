@@ -1,0 +1,13 @@
+BRACKET NAME: 4 players
+BRACKET TYPE: Single Elimination
+SPORT/GAME: Senate
+DESCRIPTION: KUNG PAPASOK AKO TATANONING BAT AKO PAPASOK
+STATUS: PENDING
+TEAMS: 4
+----------------------------------------
+Team: Kiko | Wins: 0 | Losses: 0
+Team: Robin | Wins: 0 | Losses: 0
+Team: Bato | Wins: 0 | Losses: 0
+Team: Trillanes | Wins: 0 | Losses: 0
+----------------------------------------
+MATCH RESULTS:
