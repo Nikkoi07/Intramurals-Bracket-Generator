@@ -1,4 +1,5 @@
 package src;
+
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -895,7 +896,7 @@ public class app extends Application {
     // =========================================================================
 
     private String getNotReadyMessage(int n, String type) {
-    if (n == 0) return "Single Elimination (4, 8, 12, 16, 24, 32) \nDouble Elimination (4, 8, 12, 16, 24, 32) \nRound Robin, Swiss System, and Free For All require at least 4 teams.";
+    if (n == 0) return "Single Elimination (4, 8, 16, 32) \nDouble Elimination (4, 8, 16, 32) \nPlay-in SE (12, 24) \nPlay-in DE (12, 24)\nRound Robin, Swiss System, and Free For All require at least 4 teams.";
     
     if ("Single Elimination".equals(type)) {
         if (n < 4) return "Need at least 4 Participants for Single Elimination.";

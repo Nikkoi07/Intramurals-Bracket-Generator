@@ -3,17 +3,11 @@
     "configurations": [
         {
             "type": "java",
-            "name": "app",
-            "request": "launch",
-            "mainClass": "src.app",
-            "projectName": "Intramurals Bracket Generator_546af023"
-        },
-        {
-            "type": "java",
             "name": "Run JavaFX App",
             "request": "launch",
-            "mainClass": "app",
-            "vmArgs": "--module-path \"C:/Users/james/Downloads/javafx-sdk-17.0.19/lib\" --add-modules javafx.controls,javafx.fxml"
+            "mainClass": "src.app",
+            "projectName": "Intramurals Bracket Generator_546af023",
+            "vmArgs": "--module-path \"C:/Users/james/Downloads/javafx-sdk-17.0.19/lib\" --add-modules javafx.controls,javafx.fxml,javafx.graphics,javafx.base"
         }
     ]
 }

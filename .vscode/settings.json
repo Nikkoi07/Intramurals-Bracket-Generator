@@ -1,5 +1,6 @@
 {
     "java.project.referencedLibraries": [
         "C:/Users/james/Downloads/javafx-sdk-17.0.19/lib/**/*.jar"
-    ]
+    ],
+    "java.configuration.updateBuildConfiguration": "automatic"
 }
