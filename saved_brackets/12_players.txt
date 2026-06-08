@@ -1,25 +1,87 @@
 BRACKET NAME: 12 players
-BRACKET TYPE: Double Elimination
+BRACKET TYPE: Round Robin
 SPORT/GAME: Senate
 DESCRIPTION: 
-STATUS: PENDING
+STATUS: COMPLETE
 TEAMS: 12
 ----------------------------------------
-Team: Kiko | Wins: 0 | Losses: 0
-Team: Robin | Wins: 0 | Losses: 0
-Team: Bato | Wins: 0 | Losses: 0
-Team: Trillanes | Wins: 0 | Losses: 0
-Team: Daniel | Wins: 0 | Losses: 0
-Team: Dave | Wins: 0 | Losses: 0
-Team: Juan | Wins: 0 | Losses: 0
-Team: Mark | Wins: 0 | Losses: 0
-Team: Kilo | Wins: 0 | Losses: 0
-Team: John | Wins: 0 | Losses: 0
-Team: Jungkook | Wins: 0 | Losses: 0
-Team: Kuya Kim | Wins: 0 | Losses: 0
+Team: Bato | Wins: 7 | Losses: 4
+Team: John | Wins: 7 | Losses: 4
+Team: Trillanes | Wins: 3 | Losses: 8
+Team: Kilo | Wins: 6 | Losses: 5
+Team: Jungkook | Wins: 5 | Losses: 6
+Team: Kiko | Wins: 5 | Losses: 6
+Team: Juan | Wins: 5 | Losses: 6
+Team: Dave | Wins: 6 | Losses: 5
+Team: Kuya Kim | Wins: 4 | Losses: 7
+Team: Mark | Wins: 5 | Losses: 6
+Team: Daniel | Wins: 6 | Losses: 5
+Team: Robin | Wins: 7 | Losses: 4
 ----------------------------------------
 MATCH RESULTS:
-Kiko vs TBD -> Winner: Kiko (1-0)
-Trillanes vs TBD -> Winner: Trillanes (1-0)
-Robin vs TBD -> Winner: Robin (1-0)
-Bato vs TBD -> Winner: Bato (1-0)
+Bato vs Robin -> Winner: Bato (16-1)
+John vs Daniel -> Winner: John (7-0)
+Trillanes vs Mark -> Winner: Trillanes (14-10)
+Kilo vs Kuya Kim -> Winner: Kuya Kim (4-19)
+Jungkook vs Dave -> Winner: Jungkook (17-12)
+Kiko vs Juan -> Winner: Kiko (12-10)
+Bato vs Daniel -> Winner: Daniel (3-11)
+Robin vs Mark -> Winner: Robin (19-13)
+John vs Kuya Kim -> Winner: John (15-6)
+Trillanes vs Dave -> Winner: Dave (4-10)
+Kilo vs Juan -> Winner: Kilo (19-1)
+Jungkook vs Kiko -> Winner: Kiko (3-9)
+Bato vs Mark -> Winner: Mark (11-12)
+Daniel vs Kuya Kim -> Winner: Daniel (13-3)
+Robin vs Dave -> Winner: Dave (4-18)
+John vs Juan -> Winner: Juan (2-13)
+Trillanes vs Kiko -> Winner: Kiko (0-11)
+Kilo vs Jungkook -> Winner: Jungkook (5-20)
+Bato vs Kuya Kim -> Winner: Bato (7-5)
+Mark vs Dave -> Winner: Dave (3-10)
+Daniel vs Juan -> Winner: Juan (10-13)
+Robin vs Kiko -> Winner: Robin (20-12)
+John vs Jungkook -> Winner: Jungkook (15-17)
+Trillanes vs Kilo -> Winner: Kilo (8-15)
+Bato vs Dave -> Winner: Dave (12-13)
+Kuya Kim vs Juan -> Winner: Kuya Kim (16-4)
+Mark vs Kiko -> Winner: Mark (19-17)
+Daniel vs Jungkook -> Winner: Daniel (20-16)
+Robin vs Kilo -> Winner: Robin (19-10)
+John vs Trillanes -> Winner: John (13-7)
+Bato vs Juan -> Winner: Bato (20-14)
+Dave vs Kiko -> Winner: Kiko (0-13)
+Kuya Kim vs Jungkook -> Winner: Jungkook (2-15)
+Mark vs Kilo -> Winner: Kilo (8-19)
+Daniel vs Trillanes -> Winner: Trillanes (0-1)
+Robin vs John -> Winner: John (0-14)
+Bato vs Kiko -> Winner: Bato (17-2)
+Juan vs Jungkook -> Winner: Juan (6-1)
+Dave vs Kilo -> Winner: Kilo (3-4)
+Kuya Kim vs Trillanes -> Winner: Trillanes (6-11)
+Mark vs John -> Winner: John (6-9)
+Daniel vs Robin -> Winner: Daniel (18-0)
+Bato vs Jungkook -> Winner: Bato (12-7)
+Kiko vs Kilo -> Winner: Kilo (0-4)
+Juan vs Trillanes -> Winner: Juan (10-6)
+Dave vs John -> Winner: Dave (11-9)
+Kuya Kim vs Robin -> Winner: Robin (1-19)
+Mark vs Daniel -> Winner: Mark (20-19)
+Bato vs Kilo -> Winner: Bato (16-11)
+Jungkook vs Trillanes -> Winner: Jungkook (15-14)
+Kiko vs John -> Winner: Kiko (18-12)
+Juan vs Robin -> Winner: Robin (8-14)
+Dave vs Daniel -> Winner: Daniel (11-20)
+Kuya Kim vs Mark -> Winner: Kuya Kim (11-1)
+Bato vs Trillanes -> Winner: Bato (10-3)
+Kilo vs John -> Winner: John (1-12)
+Jungkook vs Robin -> Winner: Robin (13-14)
+Kiko vs Daniel -> Winner: Daniel (2-9)
+Juan vs Mark -> Winner: Mark (12-17)
+Dave vs Kuya Kim -> Winner: Dave (20-7)
+Bato vs John -> Winner: John (0-8)
+Trillanes vs Robin -> Winner: Robin (5-15)
+Kilo vs Daniel -> Winner: Kilo (16-11)
+Jungkook vs Mark -> Winner: Mark (8-15)
+Kiko vs Kuya Kim -> Winner: Kuya Kim (2-8)
+Juan vs Dave -> Winner: Juan (15-12)

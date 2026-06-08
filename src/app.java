@@ -1,5 +1,3 @@
-package src;
-
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -291,8 +289,9 @@ public class app extends Application {
         if (e.getCode() == javafx.scene.input.KeyCode.ENTER) {
             String name = typingBuffer.toString().trim();
             if (!name.isEmpty()) {
-                if (teams.length >= 32) {
-                    showAlert("Team Limit Reached", "Maximum of 32 teams allowed.");
+                int maxAllowed = getMaxTeamsAllowed(bracketTypeCombo.getValue());
+                if (teams.length >= maxAllowed) {
+                    showAlert("Team Limit Reached", "Maximum of " + maxAllowed + " teams allowed for " + bracketTypeCombo.getValue() + ".");
                 } else {
                     Team[] newTeams = new Team[teams.length + 1];
                     System.arraycopy(teams, 0, newTeams, 0, teams.length);
@@ -520,8 +519,8 @@ public class app extends Application {
         List<Match> pending = new ArrayList<>();
         for (Match m : tournament.getAllMatches()) {
             if (!m.isCompleted() && m.getTeam1() != null && m.getTeam2() != null
-                    && !m.getTeam1().getName().equals("TBD")
-                    && !m.getTeam2().getName().equals("TBD")) {
+                    && !m.getTeam1().getName().equals("TBA")
+                    && !m.getTeam2().getName().equals("TBA")) {
                 pending.add(m);
             }
         }
@@ -585,11 +584,22 @@ public class app extends Application {
             case "Double Elimination":
                 return (isPowerOfTwo(n) && n >= 4 && n <= 32) || n == 24 || n == 12;
             case "Round Robin":
-                return n >= 4;
+                return n >= 3 && n <= 8;
+            case "Swiss System":
+                return n >= 4 && n <= 20;
             case "Free For All":
                 return n >= 4;
             default:
                 return n >= 4;
+        }
+    }
+
+    private int getMaxTeamsAllowed(String bracketType) {
+        if (bracketType == null) return 32;
+        switch (bracketType) {
+            case "Round Robin":  return 8;
+            case "Swiss System": return 20;
+            default:             return 32;
         }
     }
 
@@ -896,25 +906,25 @@ public class app extends Application {
     // =========================================================================
 
     private String getNotReadyMessage(int n, String type) {
-    if (n == 0) return "Single Elimination (4, 8, 16, 32) \nDouble Elimination (4, 8, 16, 32) \nPlay-in SE (12, 24) \nPlay-in DE (12, 24)\nRound Robin, Swiss System, and Free For All require at least 4 teams.";
+    if (n == 0) return "Single Elimination (4, 8, 16, 32) \nDouble Elimination (4, 8, 16, 32) \nPlay-in SE (12, 24) \nPlay-in DE (12, 24) \nRound Robin (3–8 teams) \nSwiss System (4–20 teams) \nFree For All requires at least 4 teams.";
     
     if ("Single Elimination".equals(type)) {
         if (n < 4) return "Need at least 4 Participants for Single Elimination.";
         
         // Custom prompts for 12 and 24 Team Play-in brackets
         if (n > 8 && n < 12) {
-            return "Add " + (12 - n) + " more team(s) to reach 12 Team Play-in SE.\n(Valid: 4, 8, 12, 16, 24, 32)";
+            return "Add " + (12 - n) + " more team(s) to reach 12 Team Play-in SE.\n(Valid: 12, 24)";
         }
         if (n > 16 && n < 24) {
-            return "Add " + (24 - n) + " more team(s) to reach 24 Team Play-in SE.\n(Valid: 4, 8, 12, 16, 24, 32)";
+            return "Add " + (24 - n) + " more team(s) to reach 24 Team Play-in SE.\n(Valid: 12, 24)";
         }
 
         int[] valid = {4, 8, 12, 16, 24, 32};
         for (int v : valid) {
             if (n == v) return "";
-            if (v > n)  return "Add " + (v - n) + " more team(s) to reach " + v + " teams.\n(Valid: 4, 8, 12, 16, 24, 32)";
+            if (v > n)  return "Add " + (v - n) + " more team(s) to reach " + v + " teams.\n(Valid: 4, 8, 16, 32)";
         }
-        return "Single Elimination supports 4, 8, 12, 16, 24, or 32 teams.\nCurrent: " + n;
+        return "Single Elimination supports 4, 8, 16, or 32 teams.\nCurrent: " + n;
     }
     
     if ("Double Elimination".equals(type)) {
@@ -922,20 +932,30 @@ public class app extends Application {
         
         // Custom prompts for 12 and 24 Team Play-in brackets
         if (n > 8 && n < 12) {
-            return "Add " + (12 - n) + " more team(s) to reach 12 Team Play-in DE.\n(Valid: 4, 8, 12, 16, 24, 32)";
+            return "Add " + (12 - n) + " more team(s) to reach 12 Team Play-in DE.\n(Valid: 12, 24)";
         }
         if (n > 16 && n < 24) {
-            return "Add " + (24 - n) + " more team(s) to reach 24 Team Play-in DE.\n(Valid: 4, 8, 12, 16, 24, 32)";
+            return "Add " + (24 - n) + " more team(s) to reach 24 Team Play-in DE.\n(Valid: 12, 24)";
         }
 
         if (isPowerOfTwo(n) || n == 24 || n == 12) return "";
         int[] valid = {4, 8, 12, 16, 24, 32};
-        for (int v : valid) if (v > n) return "Add " + (v - n) + " more team(s) for " + v + "-team Double Elimination.\n(Valid: 4, 8, 12, 16, 24, 32)";
-        return "Double Elimination supports 4, 8, 12, 16, 24, or 32 teams.\nCurrent: " + n;
+        for (int v : valid) if (v > n) return "Add " + (v - n) + " more team(s) for " + v + "-team Double Elimination.\n(Valid: 4, 8, 16, 32)";
+        return "Double Elimination supports 4, 8, 16, 32 teams.\nCurrent: " + n;
     }
     
     if ("Free For All".equals(type)) {
         if (n < 4) return "Need at least 4 teams for Free For All.";
+        return "";
+    }
+    if ("Round Robin".equals(type)) {
+        if (n < 3) return "Need at least 3 teams for Round Robin.";
+        if (n > 8) return "Round Robin supports a maximum of 8 teams.\nCurrent: " + n;
+        return "";
+    }
+    if ("Swiss System".equals(type)) {
+        if (n < 4)  return "Need at least 4 teams for Swiss System.";
+        if (n > 20) return "Swiss System supports a maximum of 20 teams.\nCurrent: " + n;
         return "";
     }
     if (n < 4) return "Need at least 4 teams for " + type + ".";
@@ -1106,7 +1126,7 @@ public class app extends Application {
         for (int ri = 0; ri < visRoundKeys.size(); ri++) {
             int fromEnd = visRounds - 1 - ri;
             String rName;
-            if (fromEnd == 0)      rName = "Championship";
+            if (fromEnd == 0)      rName = "Grand Finals";
             else if (fromEnd == 1) rName = "Finals";
             else if (fromEnd == 2) rName = "Semifinals";
             else if (fromEnd == 3) rName = "Quarterfinals";
@@ -1396,14 +1416,19 @@ public class app extends Application {
 
         // Section labels
         double wbTopY = visWbByRound.isEmpty() ? W_TOP_PAD :
-    visWbByRound.get(wRoundKeys.get(0)).stream()
+        visWbByRound.get(wRoundKeys.get(0)).stream()
         .filter(matchY::containsKey).mapToDouble(matchY::get).min().orElse(W_TOP_PAD);
-double lbTopY = losersByRound.isEmpty() ? lbOffsetY + 60 :
-    losersByRound.get(lRounds.get(0)).stream()
+        double lbTopY = losersByRound.isEmpty() ? lbOffsetY + 60 :
+        losersByRound.get(lRounds.get(0)).stream()
         .filter(matchY::containsKey).mapToDouble(matchY::get).min().orElse(lbOffsetY + 60);
 
-addPaneLabel(pane, "WINNERS BRACKET", wCols > 0 ? wColX[0] : 20, wbTopY - 52, "#FFBA09", FontWeight.BOLD, 13);
-addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#FFBA09", FontWeight.BOLD, 13);
+        addPaneLabel(pane, "WINNERS BRACKET", wCols > 0 ? wColX[0] : 20, wbTopY - 52, "#FFBA09", FontWeight.BOLD, 13);
+        addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#FFBA09", FontWeight.BOLD, 13);
+        if (grandFinal != null && matchY.containsKey(grandFinal)) {
+        addPaneLabel(pane, "Grand Finals", gfX, gfY - 22, "#FFD862", FontWeight.BOLD, 12);
+        }
+
+
         // WB round labels
         for (int ri = 0; ri < wRoundKeys.size(); ri++) {
             int r = wRoundKeys.get(ri);
@@ -1470,330 +1495,319 @@ addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#
     // DOUBLE ELIMINATION (standard: 4, 8, 16, 32)
 
     private void displayDoubleElimination() {
-        int n         = teams.length;
-        
-        final double CARD_W      = 180;
-        final double CARD_H      = 68;
-        final double CARD_MID    = CARD_H / 2.0;
-        final double COL_GAP     = 70;
-        final double MATCH_V_GAP = (n == 32) ? 0 : (n == 24) ? -20 : (n == 16) ? 5 : 24;
-        final double LB_V_GAP    = 10;
-        final double W_TOP_PAD   = 70;
-        final double SECTION_GAP = 60;
+    int n         = teams.length;
+    
+    final double CARD_W      = 180;
+    final double CARD_H      = 68;
+    final double CARD_MID    = CARD_H / 2.0;
+    final double COL_GAP     = 70;
+    final double MATCH_V_GAP = (n == 32) ? 0 : (n == 24) ? -20 : (n == 16) ? 5 : 24;
+    final double LB_V_GAP    = 10;
+    final double W_TOP_PAD   = 70;
+    final double SECTION_GAP = 60;
 
-        int numRounds = (n == 24) ? 5 : (int)(Math.log(n) / Math.log(2));
-        int winnersRounds = numRounds;
-        boolean is24 = (n == 24);
+    int numRounds = (n == 24) ? 5 : (int)(Math.log(n) / Math.log(2));
+    int winnersRounds = numRounds;
+    boolean is24 = (n == 24);
 
-        // ── Collect ALL WB matches by round (includes bye matches for 24-team) ─
-        Map<Integer, List<Match>> winnersByRound = new HashMap<>();
-        for (int r = 1; r <= winnersRounds; r++) {
-            List<Match> ms = tournament.getWinnersMatchesByRound(r);
-            if (!ms.isEmpty()) winnersByRound.put(r, ms);
+    Map<Integer, List<Match>> winnersByRound = new HashMap<>();
+    for (int r = 1; r <= winnersRounds; r++) {
+        List<Match> ms = tournament.getWinnersMatchesByRound(r);
+        if (!ms.isEmpty()) winnersByRound.put(r, ms);
+    }
+
+    Map<Integer, List<Match>> visWbByRound = new LinkedHashMap<>();
+    for (int r = 1; r <= winnersRounds; r++) {
+        List<Match> all = winnersByRound.get(r);
+        if (all == null) continue;
+        if (is24 && r == 1) {
+            List<Match> real = new ArrayList<>();
+            for (Match m : all) {
+                boolean isBye = m.isCompleted() && (m.getTeam1() == null || m.getTeam2() == null);
+                if (!isBye) real.add(m);
+            }
+            if (!real.isEmpty()) visWbByRound.put(r, real);
+        } else {
+            visWbByRound.put(r, all);
         }
+    }
+    List<Integer> wRoundKeys = new ArrayList<>(visWbByRound.keySet());
+    Collections.sort(wRoundKeys);
+    int wCols = wRoundKeys.size();
 
-        // ── Build VISIBLE WB round map (skip bye-only matches from R1 for 24) ─
-        // For 24-team: R1 has 16 slots (8 real + 8 byes). We only SHOW real ones.
-        // Bye matches keep their Y so child-link midpoint works for R2+, but
-        // they are excluded from the visible column used for card placement & lines.
-        Map<Integer, List<Match>> visWbByRound = new LinkedHashMap<>();
-        for (int r = 1; r <= winnersRounds; r++) {
-            List<Match> all = winnersByRound.get(r);
-            if (all == null) continue;
-            if (is24 && r == 1) {
-                // Only include real (non-bye) R1 matches in the visible map
-                List<Match> real = new ArrayList<>();
-                for (Match m : all) {
-                    boolean isBye = m.isCompleted() && (m.getTeam1() == null || m.getTeam2() == null);
-                    if (!isBye) real.add(m);
-                }
-                if (!real.isEmpty()) visWbByRound.put(r, real);
+    List<Match> losersAll = tournament.getLosersBracketMatches();
+    Map<Integer, List<Match>> losersByRound = new LinkedHashMap<>();
+    for (Match m : losersAll) {
+        losersByRound.computeIfAbsent(m.getRound(), k -> new ArrayList<>()).add(m);
+    }
+    List<Integer> lRounds = new ArrayList<>(losersByRound.keySet());
+    Collections.sort(lRounds);
+    int lCols = lRounds.size();
+
+    Match grandFinal = tournament.getGrandFinals();
+
+    double colStride = CARD_W + COL_GAP;
+    double[] wColX = new double[Math.max(wCols, 1)];
+    for (int c = 0; c < wCols; c++) wColX[c] = 20 + c * colStride;
+    double[] lColX = new double[Math.max(lCols, 1)];
+    for (int c = 0; c < lCols; c++) lColX[c] = 20 + c * colStride;
+
+    Map<Match, Double> matchY = new HashMap<>();
+    double slotH = CARD_H + MATCH_V_GAP;
+
+    List<Match> r1Anchor = (!wRoundKeys.isEmpty()) ? visWbByRound.get(wRoundKeys.get(0)) : new ArrayList<>();
+    if (is24 && winnersByRound.containsKey(1)) r1Anchor = winnersByRound.get(1);
+    if (r1Anchor != null)
+        for (int i = 0; i < r1Anchor.size(); i++)
+            matchY.put(r1Anchor.get(i), W_TOP_PAD + i * slotH);
+
+    for (int ri = 1; ri < wRoundKeys.size(); ri++) {
+        List<Match> prev = visWbByRound.get(wRoundKeys.get(ri - 1));
+        List<Match> curr = visWbByRound.get(wRoundKeys.get(ri));
+        if (prev == null || curr == null) continue;
+        for (int i = 0; i < curr.size(); i++) {
+            if (curr.size() == prev.size()) {
+                if (matchY.containsKey(prev.get(i))) matchY.put(curr.get(i), matchY.get(prev.get(i)));
             } else {
-                visWbByRound.put(r, all);
+                int p1 = i * 2, p2 = i * 2 + 1;
+                Double y1 = (p1 < prev.size() && matchY.containsKey(prev.get(p1))) ? matchY.get(prev.get(p1)) : null;
+                Double y2 = (p2 < prev.size() && matchY.containsKey(prev.get(p2))) ? matchY.get(prev.get(p2)) : null;
+                if      (y1 != null && y2 != null) matchY.put(curr.get(i), (y1 + y2) / 2.0);
+                else if (y1 != null)               matchY.put(curr.get(i), y1);
+                else if (y2 != null)               matchY.put(curr.get(i), y2);
             }
         }
-        List<Integer> wRoundKeys = new ArrayList<>(visWbByRound.keySet());
-        Collections.sort(wRoundKeys);
-        int wCols = wRoundKeys.size();
+    }
 
-        // ── Collect LB matches by round ──────────────────────────────────────
-        List<Match> losersAll = tournament.getLosersBracketMatches();
-        Map<Integer, List<Match>> losersByRound = new LinkedHashMap<>();
-        for (Match m : losersAll) {
-            losersByRound.computeIfAbsent(m.getRound(), k -> new ArrayList<>()).add(m);
-        }
-        List<Integer> lRounds = new ArrayList<>(losersByRound.keySet());
-        Collections.sort(lRounds);
-        int lCols = lRounds.size();
+    double winnersMaxY = matchY.values().stream().mapToDouble(Double::doubleValue).max().orElse(W_TOP_PAD);
+    double lbOffsetY   = winnersMaxY + CARD_H + SECTION_GAP;
 
-        Match grandFinal = tournament.getGrandFinals();
+    if (!lRounds.isEmpty()) {
+        List<Match> lbC0 = losersByRound.get(lRounds.get(0));
+        double lbSlotH = CARD_H + LB_V_GAP;
+        if (lbC0 != null)
+            for (int i = 0; i < lbC0.size(); i++)
+                matchY.put(lbC0.get(i), lbOffsetY + 60 + i * lbSlotH);
 
-        double colStride = CARD_W + COL_GAP;
-        double[] wColX = new double[Math.max(wCols, 1)];
-        for (int c = 0; c < wCols; c++) wColX[c] = 20 + c * colStride;
-        double[] lColX = new double[Math.max(lCols, 1)];
-        for (int c = 0; c < lCols; c++) lColX[c] = 20 + c * colStride;
-
-        Map<Match, Double> matchY = new HashMap<>();
-        double slotH = CARD_H + MATCH_V_GAP;
-
-        List<Match> r1Anchor = (!wRoundKeys.isEmpty()) ? visWbByRound.get(wRoundKeys.get(0)) : new ArrayList<>();
-        if (is24 && winnersByRound.containsKey(1)) r1Anchor = winnersByRound.get(1);
-        if (r1Anchor != null)
-            for (int i = 0; i < r1Anchor.size(); i++)
-                matchY.put(r1Anchor.get(i), W_TOP_PAD + i * slotH);
-
-        for (int ri = 1; ri < wRoundKeys.size(); ri++) {
-            List<Match> prev = visWbByRound.get(wRoundKeys.get(ri - 1));
-            List<Match> curr = visWbByRound.get(wRoundKeys.get(ri));
-            if (prev == null || curr == null) continue;
-            for (int i = 0; i < curr.size(); i++) {
-                if (curr.size() == prev.size()) {
-                    if (matchY.containsKey(prev.get(i))) matchY.put(curr.get(i), matchY.get(prev.get(i)));
-                } else {
-                    int p1 = i * 2, p2 = i * 2 + 1;
-                    Double y1 = (p1 < prev.size() && matchY.containsKey(prev.get(p1))) ? matchY.get(prev.get(p1)) : null;
-                    Double y2 = (p2 < prev.size() && matchY.containsKey(prev.get(p2))) ? matchY.get(prev.get(p2)) : null;
-                    if      (y1 != null && y2 != null) matchY.put(curr.get(i), (y1 + y2) / 2.0);
-                    else if (y1 != null)               matchY.put(curr.get(i), y1);
-                    else if (y2 != null)               matchY.put(curr.get(i), y2);
-                }
-            }
-        }
-
-        double winnersMaxY = matchY.values().stream().mapToDouble(Double::doubleValue).max().orElse(W_TOP_PAD);
-        double lbOffsetY   = winnersMaxY + CARD_H + SECTION_GAP;
-
-        // LB col-0: evenly spaced
-        if (!lRounds.isEmpty()) {
-            List<Match> lbC0 = losersByRound.get(lRounds.get(0));
-            double lbSlotH = CARD_H + LB_V_GAP;
-            if (lbC0 != null)
-                for (int i = 0; i < lbC0.size(); i++)
-                    matchY.put(lbC0.get(i), lbOffsetY + 60 + i * lbSlotH);
-
-            // LB later columns: midpoint or 1:1 depending on count
-            for (int ci = 1; ci < lRounds.size(); ci++) {
-                List<Match> prev = losersByRound.get(lRounds.get(ci - 1));
-                List<Match> curr = losersByRound.get(lRounds.get(ci));
-                if (prev == null || curr == null) continue;
-                int prevSize = prev.size(), currSize = curr.size();
-                if (currSize == prevSize) {
-                    for (int i = 0; i < currSize; i++)
-                        if (matchY.containsKey(prev.get(i)))
-                            matchY.put(curr.get(i), matchY.get(prev.get(i)));
-                } else {
-                    for (int i = 0; i < currSize; i++) {
-                        int c1 = i * 2, c2 = i * 2 + 1;
-                        double y1 = c1 < prevSize && matchY.containsKey(prev.get(c1)) ? matchY.get(prev.get(c1)) : lbOffsetY + 60;
-                        double y2 = c2 < prevSize && matchY.containsKey(prev.get(c2)) ? matchY.get(prev.get(c2)) : y1;
-                        matchY.put(curr.get(i), (y1 + y2) / 2.0);
-                    }
-                }
-            }
-        }
-
-        // Grand Final: vertically centered between WB and LB
-        double lbBotY    = matchY.values().stream().mapToDouble(Double::doubleValue).max().orElse(lbOffsetY) + CARD_H;
-        double gfCenterY = (W_TOP_PAD + lbBotY) / 2.0;
-        double lastWbRX  = wCols > 0 ? wColX[wCols - 1] + CARD_W : 0;
-        double lastLbRX  = lCols > 0 ? lColX[lCols - 1] + CARD_W : 0;
-        double gfX = Math.max(lastWbRX, lastLbRX) + COL_GAP;
-        double gfY = gfCenterY - CARD_MID;
-        if (grandFinal != null) matchY.put(grandFinal, gfY);
-
-        // ── Canvas sizing ────────────────────────────────────────────────────
-        double maxY    = matchY.values().stream().mapToDouble(Double::doubleValue).max().orElse(400);
-        double canvasW = gfX + CARD_W + 60;
-        double canvasH = maxY + CARD_H + 80;
-
-        Pane pane = new Pane();
-        pane.setPrefSize(canvasW, canvasH);
-        pane.setStyle("-fx-background-color: #040D43;");
-
-        Canvas canvas = new Canvas(canvasW, canvasH);
-        GraphicsContext gc = canvas.getGraphicsContext2D();
-        gc.setStroke(Color.web("#FFBA09"));
-        gc.setLineWidth(2);
-
-        // WB connector lines: 1:1 rounds draw straight across; 2:1 rounds draw branching pair
-        for (int ri = 1; ri < wRoundKeys.size(); ri++) {
-            List<Match> prev = visWbByRound.get(wRoundKeys.get(ri - 1));
-            List<Match> curr = visWbByRound.get(wRoundKeys.get(ri));
-            if (prev == null || curr == null) continue;
-            double srcRX = wColX[ri - 1] + CARD_W;
-            double dstLX = wColX[ri];
-            double midX  = (srcRX + dstLX) / 2.0;
-            for (int i = 0; i < curr.size(); i++) {
-                Match m = curr.get(i);
-                if (!matchY.containsKey(m)) continue;
-                double tgtY = matchY.get(m) + CARD_MID;
-                if (curr.size() == prev.size()) {
-                    // 1:1: straight line from prev[i] to curr[i]
-                    if (matchY.containsKey(prev.get(i))) {
-                        double y = matchY.get(prev.get(i)) + CARD_MID;
-                        gc.strokeLine(srcRX, y, midX, y);
-                        gc.strokeLine(midX, y, midX, tgtY);
-                        gc.strokeLine(midX, tgtY, dstLX, tgtY);
-                    }
-                } else {
-                    // 2:1: two feeders branch into one
-                    int p1 = i * 2, p2 = i * 2 + 1;
-                    if (p1 < prev.size() && matchY.containsKey(prev.get(p1))) {
-                        double y = matchY.get(prev.get(p1)) + CARD_MID;
-                        gc.strokeLine(srcRX, y, midX, y);
-                        gc.strokeLine(midX, y, midX, tgtY);
-                        gc.strokeLine(midX, tgtY, dstLX, tgtY);
-                    }
-                    if (p2 < prev.size() && matchY.containsKey(prev.get(p2))) {
-                        double y = matchY.get(prev.get(p2)) + CARD_MID;
-                        gc.strokeLine(srcRX, y, midX, y);
-                        gc.strokeLine(midX, y, midX, tgtY);
-                        gc.strokeLine(midX, tgtY, dstLX, tgtY);
-                    }
-                }
-            }
-        }
-
-
-        // ── LB connector lines ───────────────────────────────────────────────
         for (int ci = 1; ci < lRounds.size(); ci++) {
             List<Match> prev = losersByRound.get(lRounds.get(ci - 1));
             List<Match> curr = losersByRound.get(lRounds.get(ci));
             if (prev == null || curr == null) continue;
-            double srcRX = lColX[ci - 1] + CARD_W;
-            double dstLX = lColX[ci];
-            double midX  = (srcRX + dstLX) / 2.0;
             int prevSize = prev.size(), currSize = curr.size();
-            for (int i = 0; i < currSize; i++) {
-                Match m = curr.get(i);
-                if (!matchY.containsKey(m)) continue;
-                double tgtY = matchY.get(m) + CARD_MID;
-                if (currSize == prevSize) {
-                    if (matchY.containsKey(prev.get(i))) {
-                        double y = matchY.get(prev.get(i)) + CARD_MID;
-                        gc.strokeLine(srcRX, y, midX, y);
-                        gc.strokeLine(midX, y, midX, tgtY);
-                        gc.strokeLine(midX, tgtY, dstLX, tgtY);
-                    }
-                } else {
+            if (currSize == prevSize) {
+                for (int i = 0; i < currSize; i++)
+                    if (matchY.containsKey(prev.get(i)))
+                        matchY.put(curr.get(i), matchY.get(prev.get(i)));
+            } else {
+                for (int i = 0; i < currSize; i++) {
                     int c1 = i * 2, c2 = i * 2 + 1;
-                    if (c1 < prevSize && matchY.containsKey(prev.get(c1))) {
-                        double y = matchY.get(prev.get(c1)) + CARD_MID;
-                        gc.strokeLine(srcRX, y, midX, y);
-                        gc.strokeLine(midX, y, midX, tgtY);
-                        gc.strokeLine(midX, tgtY, dstLX, tgtY);
-                    }
-                    if (c2 < prevSize && matchY.containsKey(prev.get(c2))) {
-                        double y = matchY.get(prev.get(c2)) + CARD_MID;
-                        gc.strokeLine(srcRX, y, midX, y);
-                        gc.strokeLine(midX, y, midX, tgtY);
-                        gc.strokeLine(midX, tgtY, dstLX, tgtY);
-                    }
+                    double y1 = c1 < prevSize && matchY.containsKey(prev.get(c1)) ? matchY.get(prev.get(c1)) : lbOffsetY + 60;
+                    double y2 = c2 < prevSize && matchY.containsKey(prev.get(c2)) ? matchY.get(prev.get(c2)) : y1;
+                    matchY.put(curr.get(i), (y1 + y2) / 2.0);
                 }
             }
         }
+    }
 
-        // ── Grand Final feed lines ───────────────────────────────────────────
-        if (grandFinal != null && matchY.containsKey(grandFinal)) {
-            gc.setStroke(Color.web("#FFBA09")); gc.setLineWidth(2.5);
-            double gfCY   = matchY.get(grandFinal) + CARD_MID;
-            double mergeX = gfX - COL_GAP / 2.0;
-            // WB final → GF
-            List<Match> lastW = visWbByRound.get(wRoundKeys.isEmpty() ? -1 : wRoundKeys.get(wRoundKeys.size() - 1));
-            if (lastW != null && !lastW.isEmpty() && matchY.containsKey(lastW.get(0))) {
-                double wy = matchY.get(lastW.get(0)) + CARD_MID;
-                double wx = wColX[wCols - 1] + CARD_W;
-                gc.strokeLine(wx, wy, mergeX, wy);
-                gc.strokeLine(mergeX, wy, mergeX, gfCY);
+    double lbBotY    = matchY.values().stream().mapToDouble(Double::doubleValue).max().orElse(lbOffsetY) + CARD_H;
+    double gfCenterY = (W_TOP_PAD + lbBotY) / 2.0;
+    double lastWbRX  = wCols > 0 ? wColX[wCols - 1] + CARD_W : 0;
+    double lastLbRX  = lCols > 0 ? lColX[lCols - 1] + CARD_W : 0;
+    double gfX = Math.max(lastWbRX, lastLbRX) + COL_GAP;
+    double gfY = gfCenterY - CARD_MID;
+    if (grandFinal != null) matchY.put(grandFinal, gfY);
+
+    double maxY    = matchY.values().stream().mapToDouble(Double::doubleValue).max().orElse(400);
+    double canvasW = gfX + CARD_W + 60;
+    double canvasH = maxY + CARD_H + 80;
+
+    Pane pane = new Pane();
+    pane.setPrefSize(canvasW, canvasH);
+    pane.setStyle("-fx-background-color: #040D43;");
+
+    Canvas canvas = new Canvas(canvasW, canvasH);
+    GraphicsContext gc = canvas.getGraphicsContext2D();
+    gc.setStroke(Color.web("#FFBA09"));
+    gc.setLineWidth(2);
+
+    // WB connector lines
+    for (int ri = 1; ri < wRoundKeys.size(); ri++) {
+        List<Match> prev = visWbByRound.get(wRoundKeys.get(ri - 1));
+        List<Match> curr = visWbByRound.get(wRoundKeys.get(ri));
+        if (prev == null || curr == null) continue;
+        double srcRX = wColX[ri - 1] + CARD_W;
+        double dstLX = wColX[ri];
+        double midX  = (srcRX + dstLX) / 2.0;
+        for (int i = 0; i < curr.size(); i++) {
+            Match m = curr.get(i);
+            if (!matchY.containsKey(m)) continue;
+            double tgtY = matchY.get(m) + CARD_MID;
+            if (curr.size() == prev.size()) {
+                if (matchY.containsKey(prev.get(i))) {
+                    double y = matchY.get(prev.get(i)) + CARD_MID;
+                    gc.strokeLine(srcRX, y, midX, y);
+                    gc.strokeLine(midX, y, midX, tgtY);
+                    gc.strokeLine(midX, tgtY, dstLX, tgtY);
+                }
+            } else {
+                int p1 = i * 2, p2 = i * 2 + 1;
+                if (p1 < prev.size() && matchY.containsKey(prev.get(p1))) {
+                    double y = matchY.get(prev.get(p1)) + CARD_MID;
+                    gc.strokeLine(srcRX, y, midX, y);
+                    gc.strokeLine(midX, y, midX, tgtY);
+                    gc.strokeLine(midX, tgtY, dstLX, tgtY);
+                }
+                if (p2 < prev.size() && matchY.containsKey(prev.get(p2))) {
+                    double y = matchY.get(prev.get(p2)) + CARD_MID;
+                    gc.strokeLine(srcRX, y, midX, y);
+                    gc.strokeLine(midX, y, midX, tgtY);
+                    gc.strokeLine(midX, tgtY, dstLX, tgtY);
+                }
+            }
+        }
+    }
+
+    // LB connector lines
+    for (int ci = 1; ci < lRounds.size(); ci++) {
+        List<Match> prev = losersByRound.get(lRounds.get(ci - 1));
+        List<Match> curr = losersByRound.get(lRounds.get(ci));
+        if (prev == null || curr == null) continue;
+        double srcRX = lColX[ci - 1] + CARD_W;
+        double dstLX = lColX[ci];
+        double midX  = (srcRX + dstLX) / 2.0;
+        int prevSize = prev.size(), currSize = curr.size();
+        for (int i = 0; i < currSize; i++) {
+            Match m = curr.get(i);
+            if (!matchY.containsKey(m)) continue;
+            double tgtY = matchY.get(m) + CARD_MID;
+            if (currSize == prevSize) {
+                if (matchY.containsKey(prev.get(i))) {
+                    double y = matchY.get(prev.get(i)) + CARD_MID;
+                    gc.strokeLine(srcRX, y, midX, y);
+                    gc.strokeLine(midX, y, midX, tgtY);
+                    gc.strokeLine(midX, tgtY, dstLX, tgtY);
+                }
+            } else {
+                int c1 = i * 2, c2 = i * 2 + 1;
+                if (c1 < prevSize && matchY.containsKey(prev.get(c1))) {
+                    double y = matchY.get(prev.get(c1)) + CARD_MID;
+                    gc.strokeLine(srcRX, y, midX, y);
+                    gc.strokeLine(midX, y, midX, tgtY);
+                    gc.strokeLine(midX, tgtY, dstLX, tgtY);
+                }
+                if (c2 < prevSize && matchY.containsKey(prev.get(c2))) {
+                    double y = matchY.get(prev.get(c2)) + CARD_MID;
+                    gc.strokeLine(srcRX, y, midX, y);
+                    gc.strokeLine(midX, y, midX, tgtY);
+                    gc.strokeLine(midX, tgtY, dstLX, tgtY);
+                }
+            }
+        }
+    }
+
+    // Grand Final feed lines
+    if (grandFinal != null && matchY.containsKey(grandFinal)) {
+        gc.setStroke(Color.web("#FFBA09")); gc.setLineWidth(2.5);
+        double gfCY   = matchY.get(grandFinal) + CARD_MID;
+        double mergeX = gfX - COL_GAP / 2.0;
+        List<Match> lastW = visWbByRound.get(wRoundKeys.isEmpty() ? -1 : wRoundKeys.get(wRoundKeys.size() - 1));
+        if (lastW != null && !lastW.isEmpty() && matchY.containsKey(lastW.get(0))) {
+            double wy = matchY.get(lastW.get(0)) + CARD_MID;
+            double wx = wColX[wCols - 1] + CARD_W;
+            gc.strokeLine(wx, wy, mergeX, wy);
+            gc.strokeLine(mergeX, wy, mergeX, gfCY);
+            gc.strokeLine(mergeX, gfCY, gfX, gfCY);
+        }
+        if (!lRounds.isEmpty()) {
+            List<Match> lastL = losersByRound.get(lRounds.get(lRounds.size() - 1));
+            if (lastL != null && !lastL.isEmpty() && matchY.containsKey(lastL.get(0))) {
+                double ly = matchY.get(lastL.get(0)) + CARD_MID;
+                double lx = lColX[lCols - 1] + CARD_W;
+                gc.strokeLine(lx, ly, mergeX, ly);
+                gc.strokeLine(mergeX, ly, mergeX, gfCY);
                 gc.strokeLine(mergeX, gfCY, gfX, gfCY);
             }
-            // LB final → GF
-            if (!lRounds.isEmpty()) {
-                List<Match> lastL = losersByRound.get(lRounds.get(lRounds.size() - 1));
-                if (lastL != null && !lastL.isEmpty() && matchY.containsKey(lastL.get(0))) {
-                    double ly = matchY.get(lastL.get(0)) + CARD_MID;
-                    double lx = lColX[lCols - 1] + CARD_W;
-                    gc.strokeLine(lx, ly, mergeX, ly);
-                    gc.strokeLine(mergeX, ly, mergeX, gfCY);
-                    gc.strokeLine(mergeX, gfCY, gfX, gfCY);
-                }
-            }
         }
+    }
 
-        pane.getChildren().add(canvas);
+    pane.getChildren().add(canvas);
 
-        // ── Section labels ───────────────────────────────────────────────────
-        double wbTopY = matchY.entrySet().stream()
+    // Section labels
+    double wbTopY = matchY.entrySet().stream()
         .filter(e -> visWbByRound.values().stream().anyMatch(list -> list.contains(e.getKey())))
         .mapToDouble(Map.Entry::getValue).min().orElse(W_TOP_PAD);
-        double lbTopY = matchY.entrySet().stream()
+    double lbTopY = matchY.entrySet().stream()
         .filter(e -> losersByRound.values().stream().anyMatch(list -> list.contains(e.getKey())))
         .mapToDouble(Map.Entry::getValue).min().orElse(lbOffsetY + 60);
 
-        addPaneLabel(pane, "WINNERS BRACKET", wCols > 0 ? wColX[0] : 20, wbTopY - 52, "#FFBA09", FontWeight.BOLD, 13);
-        addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#FFBA09", FontWeight.BOLD, 13);
+    addPaneLabel(pane, "WINNERS BRACKET", wCols > 0 ? wColX[0] : 20, wbTopY - 52, "#FFBA09", FontWeight.BOLD, 13);
+    addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#FFBA09", FontWeight.BOLD, 13);
 
-        // ── WB round labels ──────────────────────────────────────────────────
-        for (int ri = 0; ri < wRoundKeys.size(); ri++) {
-            int r = wRoundKeys.get(ri);
-            List<Match> rMs = visWbByRound.get(r);
-            if (rMs == null) continue;
-            String rName = getWinnersRoundName(r, winnersRounds);
-            Label rl = styledLabel(rName, "#FFD862", FontWeight.BOLD, 11);
-            rl.setLayoutX(wColX[ri]);
-            double topY = rMs.stream().filter(matchY::containsKey).mapToDouble(matchY::get).min().orElse(W_TOP_PAD);
-            rl.setLayoutY(topY - 18);
-            pane.getChildren().add(rl);
-        }
-
-        // ── LB round labels ──────────────────────────────────────────────────
-        for (int ci = 0; ci < lRounds.size(); ci++) {
-            int r = lRounds.get(ci);
-            List<Match> rms = losersByRound.get(r);
-            double topY = rms.stream().filter(matchY::containsKey).mapToDouble(matchY::get).min().orElse(lbOffsetY + 60);
-            Label rl = styledLabel("Losers Round " + (ci + 1), "#FFD862", FontWeight.BOLD, 11);
-            rl.setLayoutX(lColX[ci]); rl.setLayoutY(topY - 18);
-            pane.getChildren().add(rl);
-        }
-
-        // ── WB match cards ───────────────────────────────────────────────────
-        for (int ri = 0; ri < wRoundKeys.size(); ri++) {
-            List<Match> ms = visWbByRound.get(wRoundKeys.get(ri));
-            if (ms == null) continue;
-            for (Match m : ms) {
-                if (!matchY.containsKey(m)) continue;
-                VBox card = createDeMatchCard(m, true, false);
-                card.setLayoutX(wColX[ri]); card.setLayoutY(matchY.get(m));
-                card.setPrefWidth(CARD_W); card.setMaxWidth(CARD_W);
-                pane.getChildren().add(card);
-            }
-        }
-
-        // ── LB match cards ───────────────────────────────────────────────────
-        for (int ci = 0; ci < lRounds.size(); ci++) {
-            int r = lRounds.get(ci);
-            for (Match m : losersByRound.get(r)) {
-                if (!matchY.containsKey(m)) continue;
-                VBox card = createDeMatchCard(m, false, false);
-                card.setLayoutX(lColX[ci]); card.setLayoutY(matchY.get(m));
-                card.setPrefWidth(CARD_W); card.setMaxWidth(CARD_W);
-                pane.getChildren().add(card);
-            }
-        }
-
-        // ── Grand Final card ─────────────────────────────────────────────────
-        if (grandFinal != null && matchY.containsKey(grandFinal)) {
-            VBox gfCard = createDeMatchCard(grandFinal, false, true);
-            gfCard.setLayoutX(gfX); gfCard.setLayoutY(matchY.get(grandFinal));
-            gfCard.setPrefWidth(CARD_W + 20); gfCard.setMaxWidth(CARD_W + 20);
-            pane.getChildren().add(gfCard);
-        }
-
-        addScrollPane(pane, (n == 32) ? 750 : 600);
-        Team champion = tournament.getTournamentWinner();
-        if (champion != null) addChampionDisplay(champion);
+    // ── Grand Final label ─────────────────────────────────────────────── ADDED
+    if (grandFinal != null && matchY.containsKey(grandFinal)) {
+        addPaneLabel(pane, "Grand Finals", gfX, gfY - 22, "#FFD862", FontWeight.BOLD, 12);
     }
+
+    // WB round labels
+    for (int ri = 0; ri < wRoundKeys.size(); ri++) {
+        int r = wRoundKeys.get(ri);
+        List<Match> rMs = visWbByRound.get(r);
+        if (rMs == null) continue;
+        String rName = getWinnersRoundName(r, winnersRounds);
+        Label rl = styledLabel(rName, "#FFD862", FontWeight.BOLD, 11);
+        rl.setLayoutX(wColX[ri]);
+        double topY = rMs.stream().filter(matchY::containsKey).mapToDouble(matchY::get).min().orElse(W_TOP_PAD);
+        rl.setLayoutY(topY - 18);
+        pane.getChildren().add(rl);
+    }
+
+    // LB round labels
+    for (int ci = 0; ci < lRounds.size(); ci++) {
+        int r = lRounds.get(ci);
+        List<Match> rms = losersByRound.get(r);
+        double topY = rms.stream().filter(matchY::containsKey).mapToDouble(matchY::get).min().orElse(lbOffsetY + 60);
+        Label rl = styledLabel("Losers Round " + (ci + 1), "#FFD862", FontWeight.BOLD, 11);
+        rl.setLayoutX(lColX[ci]); rl.setLayoutY(topY - 18);
+        pane.getChildren().add(rl);
+    }
+
+    // WB match cards
+    for (int ri = 0; ri < wRoundKeys.size(); ri++) {
+        List<Match> ms = visWbByRound.get(wRoundKeys.get(ri));
+        if (ms == null) continue;
+        for (Match m : ms) {
+            if (!matchY.containsKey(m)) continue;
+            VBox card = createDeMatchCard(m, true, false);
+            card.setLayoutX(wColX[ri]); card.setLayoutY(matchY.get(m));
+            card.setPrefWidth(CARD_W); card.setMaxWidth(CARD_W);
+            pane.getChildren().add(card);
+        }
+    }
+
+    // LB match cards
+    for (int ci = 0; ci < lRounds.size(); ci++) {
+        int r = lRounds.get(ci);
+        for (Match m : losersByRound.get(r)) {
+            if (!matchY.containsKey(m)) continue;
+            VBox card = createDeMatchCard(m, false, false);
+            card.setLayoutX(lColX[ci]); card.setLayoutY(matchY.get(m));
+            card.setPrefWidth(CARD_W); card.setMaxWidth(CARD_W);
+            pane.getChildren().add(card);
+        }
+    }
+
+    // Grand Final card
+    if (grandFinal != null && matchY.containsKey(grandFinal)) {
+        VBox gfCard = createDeMatchCard(grandFinal, false, true);
+        gfCard.setLayoutX(gfX); gfCard.setLayoutY(matchY.get(grandFinal));
+        gfCard.setPrefWidth(CARD_W + 20); gfCard.setMaxWidth(CARD_W + 20);
+        pane.getChildren().add(gfCard);
+    }
+
+    addScrollPane(pane, (n == 32) ? 750 : 600);
+    Team champion = tournament.getTournamentWinner();
+    if (champion != null) addChampionDisplay(champion);
+}
     // =========================================================================
     // PLAY-IN DOUBLE ELIMINATION
     // Only renders play-in sections (WB / LB / GF) when they actually have matches.
@@ -1965,6 +1979,7 @@ addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#
             addPaneLabel(pane, "LOSERS BRACKET",  colX[0], lbOffsetY + 10, "#FFBA09", FontWeight.BOLD, 13);
         if (hasPiGF)
             addPaneLabel(pane, "Grand Finals", piGfX, piGfY - 22, "#FFD862", FontWeight.BOLD, 12);
+       
         // Play-in WB round labels
         if (hasPiWb) {
             for (Map.Entry<Integer, List<Match>> e : piWbByRound.entrySet()) {
@@ -2029,14 +2044,14 @@ addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#
    
     private VBox createDeMatchCard(Match match, boolean isWinners, boolean isGrandFinal) {
         String border = "#FFBA09";
-        String t1Name = match.getTeam1() != null ? match.getTeam1().getName() : "TBD";
-        String t2Name = match.getTeam2() != null ? match.getTeam2().getName() : "TBD";
+        String t1Name = match.getTeam1() != null ? match.getTeam1().getName() : "TBA";
+        String t2Name = match.getTeam2() != null ? match.getTeam2().getName() : "TBA";
         boolean done  = match.isCompleted();
         Team winner   = match.getWinner();
         String score  = match.getScore() != null ? match.getScore() : "";
 
         boolean canReport = !done && match.getTeam1() != null && match.getTeam2() != null
-        && !t1Name.equals("TBD") && !t2Name.equals("TBD");
+        && !t1Name.equals("TBA") && !t2Name.equals("TBA");
 
         String normalStyle  = "-fx-background-color:#152055;-fx-border-color:" + border + ";-fx-border-width:2;-fx-border-radius:4;-fx-background-radius:4;-fx-focus-color:transparent;-fx-faint-focus-color:transparent;" + (canReport ? "-fx-cursor:hand;" : "");
         String hoverStyle   = "-fx-background-color:#1a2a6a;-fx-border-color:#FFBA09;-fx-border-width:2;-fx-border-radius:4;-fx-background-radius:4;-fx-focus-color:transparent;-fx-faint-focus-color:transparent;-fx-cursor:hand;";
@@ -2123,16 +2138,86 @@ addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#
         container.getChildren().add(title);
 
         // ── Standings table ───────────────────────────────────────────────
+        // Standard tiebreaker order:
+        //   1. Wins  2. Head-to-Head (among tied group)  3. Point Difference  4. Points Scored
         GridPane grid = makeStandingsGrid(new String[]{"Rank","Team","Wins","Losses","Win %","PD"}, "#040D43");
         List<Team> sorted = new ArrayList<>(Arrays.asList(teams));
+        ScoreMatrix matrix = tournament.getScoreMatrix();
+
+        // Build team-index lookup (team object → index in original teams array)
+        Map<Team, Integer> teamIndex = new HashMap<>();
+        for (int i = 0; i < teams.length; i++) teamIndex.put(teams[i], i);
+
         sorted.sort((a, b) -> {
-            int w = Integer.compare(b.getWins(), a.getWins());
-            return w != 0 ? w : Integer.compare(b.getPointDifference(), a.getPointDifference());
+            // 1. Most wins first
+            int wCmp = Integer.compare(b.getWins(), a.getWins());
+            if (wCmp != 0) return wCmp;
+
+            // 2. Head-to-head among all teams tied on wins
+            //    Collect the full tied group for team a (same win count)
+            List<Team> tiedGroup = new ArrayList<>();
+            for (Team t : teams) if (t.getWins() == a.getWins()) tiedGroup.add(t);
+
+            if (tiedGroup.size() >= 2 && tiedGroup.contains(a) && tiedGroup.contains(b)) {
+                // Count wins each team has against the others in the tied group
+                int aH2HWins = 0, bH2HWins = 0;
+                for (Team t : tiedGroup) {
+                    if (t == a || t == b) continue;
+                    Integer idxA = teamIndex.get(a), idxT = teamIndex.get(t);
+                    Integer idxB = teamIndex.get(b);
+                    if (idxA != null && idxT != null && matrix.hasPlayed(idxA, idxT)) {
+                        if (matrix.getScore(idxA, idxT) > matrix.getScore(idxT, idxA)) aH2HWins++;
+                    }
+                    if (idxB != null && idxT != null && matrix.hasPlayed(idxB, idxT)) {
+                        if (matrix.getScore(idxB, idxT) > matrix.getScore(idxT, idxB)) bH2HWins++;
+                    }
+                }
+                // Direct head-to-head between a and b
+                Integer idxA = teamIndex.get(a), idxB2 = teamIndex.get(b);
+                if (idxA != null && idxB2 != null && matrix.hasPlayed(idxA, idxB2)) {
+                    int sA = matrix.getScore(idxA, idxB2);
+                    int sB = matrix.getScore(idxB2, idxA);
+                    if (sA > sB) aH2HWins++;
+                    else if (sB > sA) bH2HWins++;
+                }
+                int h2hCmp = Integer.compare(bH2HWins, aH2HWins);
+                if (h2hCmp != 0) return h2hCmp;
+            }
+
+            // 3. Point difference (higher is better)
+            int pdCmp = Integer.compare(b.getPointDifference(), a.getPointDifference());
+            if (pdCmp != 0) return pdCmp;
+
+            // 4. Total points scored (higher is better)
+            Integer idxA = teamIndex.get(a), idxB = teamIndex.get(b);
+            int psA = (idxA != null) ? matrix.getTotalPointsScored(idxA) : 0;
+            int psB = (idxB != null) ? matrix.getTotalPointsScored(idxB) : 0;
+            int psCmp = Integer.compare(psB, psA);
+            if (psCmp != 0) return psCmp;
+
+            // 5. Stable fallback: original seeding order (ensures all teams always render)
+            int seedA = (idxA != null) ? idxA : 0;
+            int seedB = (idxB != null) ? idxB : 0;
+            return Integer.compare(seedA, seedB);
         });
+
+        // Assign ranks — teams still tied after all 4 criteria share the same rank
+        // gridRow always increments so every team occupies its own GridPane row
+        int rank = 1;
         for (int i = 0; i < sorted.size(); i++) {
+            if (i > 0) {
+                Team prev = sorted.get(i - 1), curr = sorted.get(i);
+                Integer idxP = teamIndex.get(prev), idxC = teamIndex.get(curr);
+                boolean sameW  = prev.getWins() == curr.getWins();
+                boolean samePD = prev.getPointDifference() == curr.getPointDifference();
+                boolean samePS = (idxP != null && idxC != null)
+                    && matrix.getTotalPointsScored(idxP) == matrix.getTotalPointsScored(idxC);
+                if (!(sameW && samePD && samePS)) rank = i + 1;
+            }
+            int gridRow = i + 1; // always unique — prevents rows overwriting each other
             Team t = sorted.get(i);
-            addStandingsRow(grid, i + 1, new String[]{
-                String.valueOf(i + 1), t.getName(),
+            addStandingsRow(grid, gridRow, new String[]{
+                String.valueOf(rank), t.getName(),
                 String.valueOf(t.getWins()), String.valueOf(t.getLosses()),
                 String.format("%.1f%%", t.getWinPercentage()),
                 String.valueOf(t.getPointDifference())
@@ -2175,63 +2260,124 @@ addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#
 }
 
     private void displaySwissSystem() {
+        // Auto-advance: if all matches in current round are done, generate the next
+        if (tournament.canGenerateNextSwissRound()) {
+            tournament.generateNextSwissRound();
+        }
+
         VBox container = new VBox(15);
         container.setPadding(new Insets(20));
         container.setStyle("-fx-background-color: #040D43;");
-        Label title = new Label("SWISS SYSTEM TOURNAMENT");
+
+        // ── Title + round indicator ──────────────────────────────────────────
+        int curRound  = tournament.getSwissCurrentRound();
+        int totRounds = tournament.getTotalRounds();
+        Label title = new Label("SWISS SYSTEM TOURNAMENT  ·  Round " + curRound + " of " + totRounds);
         title.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         title.setTextFill(Color.web("#FFD862"));
         container.getChildren().add(title);
 
-        GridPane grid = makeStandingsGrid(new String[]{"Rank","Team","Wins","Losses","Opp Score","Points"}, "#040D43");
+        // ── Standings table ──────────────────────────────────────────────────
+        // Columns: Rank | Team | Wins | Losses | Buchholz | Pts Scored
+        // Sort: Wins DESC → Buchholz DESC → Pt-Diff DESC
+        GridPane grid = makeStandingsGrid(
+            new String[]{"Rank","Team","Wins","Losses","Buchholz","Pts"}, "#040D43");
+
+        // Use ScoreMatrix.getTotalPointsScored for accurate per-team points
+        ScoreMatrix sm = tournament.getScoreMatrix();
+
+        java.util.function.Function<Team, Integer> ptsScored = (t) -> {
+            for (int i = 0; i < teams.length; i++)
+                if (teams[i] == t) return sm.getTotalPointsScored(i);
+            return 0;
+        };
+
         List<Team> sorted = new ArrayList<>(Arrays.asList(teams));
         sorted.sort((a, b) -> {
-            int w = Integer.compare(b.getWins(), a.getWins());
-            return w != 0 ? w : Integer.compare(b.getPointsAllowed(), a.getPointsAllowed());
+            int wDiff = Integer.compare(b.getWins(), a.getWins());
+            if (wDiff != 0) return wDiff;
+            int bDiff = Integer.compare(swissBuchholz(b), swissBuchholz(a));
+            if (bDiff != 0) return bDiff;
+            return Integer.compare(ptsScored.apply(b), ptsScored.apply(a));
         });
         for (int i = 0; i < sorted.size(); i++) {
             Team t = sorted.get(i);
             addStandingsRow(grid, i + 1, new String[]{
-                String.valueOf(i + 1), t.getName(),
-                String.valueOf(t.getWins()), String.valueOf(t.getLosses()),
-                String.valueOf(t.getPointsAllowed()), String.valueOf(t.getPointsScored())
+                String.valueOf(i + 1),
+                t.getName(),
+                String.valueOf(t.getWins()),
+                String.valueOf(t.getLosses()),
+                String.valueOf(swissBuchholz(t)),
+                String.valueOf(ptsScored.apply(t))
             });
         }
         container.getChildren().add(grid);
 
-        Label pLabel = new Label("CURRENT ROUND PAIRINGS");
+        // ── Current round pairings (current round only, not all pending) ─────
+        List<Match> currentRoundMatches = tournament.getMatchesByRound(curRound);
+        // Filter: only real (non-bye) pending matches
+        List<Match> currentPending = new ArrayList<>();
+        for (Match m : currentRoundMatches) {
+            if (!m.isCompleted() && m.getTeam1() != null && m.getTeam2() != null) {
+                currentPending.add(m);
+            }
+        }
+
+        boolean roundDone = currentPending.isEmpty();
+        boolean allDone   = curRound >= totRounds && roundDone;
+
+        Label pLabel = new Label(allDone
+            ? "TOURNAMENT COMPLETE"
+            : "ROUND " + curRound + " PAIRINGS");
         pLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
         pLabel.setTextFill(Color.web("#FFBA09"));
         pLabel.setPadding(new Insets(8, 0, 2, 0));
         container.getChildren().add(pLabel);
-        List<Match> pending = tournament.getPendingMatches();
-        if (pending.isEmpty()) {
-        Label done = new Label("All rounds complete!");
-        done.setFont(Font.font("Arial", 12));
-        done.setTextFill(Color.web("#7F8EE3"));
-        container.getChildren().add(done);
+
+        if (allDone) {
+            Label done = new Label("All " + totRounds + " rounds complete! Check standings above.");
+            done.setFont(Font.font("Arial", 12));
+            done.setTextFill(Color.web("#7F8EE3"));
+            container.getChildren().add(done);
+        } else if (roundDone && curRound < totRounds) {
+            Label adv = new Label("Round " + curRound + " complete. Next round will generate when you record results.");
+            adv.setFont(Font.font("Arial", 12));
+            adv.setTextFill(Color.web("#7F8EE3"));
+            container.getChildren().add(adv);
         } else {
-        for (int i = 0; i < pending.size(); i += 2) {
-        HBox pair = new HBox(8);
-        pair.setFillHeight(true);
+            for (int i = 0; i < currentPending.size(); i += 2) {
+                HBox pair = new HBox(8);
+                pair.setFillHeight(true);
 
-        HBox left = createMatchResultRow(pending.get(i));
-        HBox.setHgrow(left, Priority.ALWAYS);
-        left.setMaxWidth(Double.MAX_VALUE);
-        pair.getChildren().add(left);
+                HBox left = createMatchResultRow(currentPending.get(i));
+                HBox.setHgrow(left, Priority.ALWAYS);
+                left.setMaxWidth(Double.MAX_VALUE);
+                pair.getChildren().add(left);
 
-        if (i + 1 < pending.size()) {
-            HBox right = createMatchResultRow(pending.get(i + 1));
-            HBox.setHgrow(right, Priority.ALWAYS);
-            right.setMaxWidth(Double.MAX_VALUE);
-            pair.getChildren().add(right);
+                if (i + 1 < currentPending.size()) {
+                    HBox right = createMatchResultRow(currentPending.get(i + 1));
+                    HBox.setHgrow(right, Priority.ALWAYS);
+                    right.setMaxWidth(Double.MAX_VALUE);
+                    pair.getChildren().add(right);
+                }
+
+                container.getChildren().add(pair);
+            }
         }
 
-        container.getChildren().add(pair);
-        }
-    }
         addScrollPane(container, 550, true);
-}
+    }
+
+    /** Buchholz = sum of all opponents' wins (used in Swiss standings) */
+    private int swissBuchholz(Team t) {
+        int sum = 0;
+        for (Match m : tournament.getAllMatches()) {
+            if (!m.isCompleted()) continue;
+            if (m.getTeam1() == t && m.getTeam2() != null) sum += m.getTeam2().getWins();
+            else if (m.getTeam2() == t && m.getTeam1() != null) sum += m.getTeam1().getWins();
+        }
+        return sum;
+    }
 
     private void displayFreeForAll() {
         VBox container = new VBox(15);
@@ -2344,8 +2490,8 @@ addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#
     row.setPadding(new Insets(6, 10, 6, 10));
     row.setStyle(normalStyle);
 
-    String t1 = match.getTeam1() != null ? match.getTeam1().getName() : "TBD";
-    String t2 = match.getTeam2() != null ? match.getTeam2().getName() : "TBD";
+    String t1 = match.getTeam1() != null ? match.getTeam1().getName() : "TBA";
+    String t2 = match.getTeam2() != null ? match.getTeam2().getName() : "TBA";
 
     Label matchLabel = new Label(t1 + " vs " + t2);
     matchLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
@@ -2504,8 +2650,8 @@ addPaneLabel(pane, "LOSERS BRACKET",  lCols > 0 ? lColX[0] : 20, lbTopY - 52, "#
             writer.println("MATCH RESULTS:");
             if (tournament != null) for (Match m : tournament.getAllMatches()) {
                 if (m.isCompleted()) {
-                    String t1 = m.getTeam1() != null ? m.getTeam1().getName() : "TBD";
-                    String t2 = m.getTeam2() != null ? m.getTeam2().getName() : "TBD";
+                    String t1 = m.getTeam1() != null ? m.getTeam1().getName() : "TBA";
+                    String t2 = m.getTeam2() != null ? m.getTeam2().getName() : "TBA";
                     writer.println(t1 + " vs " + t2 + " -> Winner: " + m.getWinner().getName() + " (" + m.getScore() + ")");
                 }
             }
@@ -2872,9 +3018,15 @@ private void showSwissScoreMatrix() {
             container.getChildren().add(none);
         }
 
-        List<Match> pending = tournament.getPendingMatches();
+        // Show only current round's pending matches (not all future rounds)
+        int swissCurRound = tournament.getSwissCurrentRound();
+        List<Match> curRoundMatches = tournament.getMatchesByRound(swissCurRound);
+        List<Match> pending = new ArrayList<>();
+        for (Match m : curRoundMatches)
+            if (!m.isCompleted() && m.getTeam1() != null && m.getTeam2() != null)
+                pending.add(m);
         if (!pending.isEmpty()) {
-            Label pendingLbl = new Label("Current Round Pairings");
+            Label pendingLbl = new Label("Round " + swissCurRound + " — Pending");
             pendingLbl.setFont(Font.font("Arial", FontWeight.BOLD, 12));
             pendingLbl.setTextFill(Color.web("#7F8EE3"));
             pendingLbl.setPadding(new Insets(10, 0, 2, 0));
@@ -2897,8 +3049,8 @@ private HBox buildSwissMatchRow(Match m, Stage stage, Runnable refresh) {
     row.setAlignment(Pos.CENTER_LEFT);
     row.setStyle(normalStyle);
 
-    String t1 = m.getTeam1() != null ? m.getTeam1().getName() : "TBD";
-    String t2 = m.getTeam2() != null ? m.getTeam2().getName() : "TBD";
+    String t1 = m.getTeam1() != null ? m.getTeam1().getName() : "TBA";
+    String t2 = m.getTeam2() != null ? m.getTeam2().getName() : "TBA";
     boolean done = m.isCompleted();
     String winnerName = (done && m.getWinner() != null) ? m.getWinner().getName() : null;
 
@@ -3060,8 +3212,8 @@ private HBox buildElimMatchRow(Match m, Stage stage, Runnable refresh) {
     row.setAlignment(Pos.CENTER_LEFT);
     row.setStyle(normalStyle);
 
-    String t1 = m.getTeam1() != null ? m.getTeam1().getName() : "TBD";
-    String t2 = m.getTeam2() != null ? m.getTeam2().getName() : "TBD";
+    String t1 = m.getTeam1() != null ? m.getTeam1().getName() : "TBA";
+    String t2 = m.getTeam2() != null ? m.getTeam2().getName() : "TBA";
     boolean done = m.isCompleted();
     String winnerName = (done && m.getWinner() != null) ? m.getWinner().getName() : null;
 
@@ -3086,7 +3238,7 @@ private HBox buildElimMatchRow(Match m, Stage stage, Runnable refresh) {
     if (done && m.getScore() != null) {
         result.setText(m.getScore());
         result.setStyle("-fx-text-fill: #FFD862;");
-    } else if (!t1.equals("TBD") && !t2.equals("TBD")) {
+    } else if (!t1.equals("TBA") && !t2.equals("TBA")) {
         result.setText("PENDING ›");
         result.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 10px;");
         row.setOnMouseEntered(e -> row.setStyle(hoverStyle));
@@ -3098,7 +3250,7 @@ private HBox buildElimMatchRow(Match m, Stage stage, Runnable refresh) {
             if (refresh != null) refresh.run(); // ← rebuilds list in-place
         });
     } else {
-        result.setText("TBD");
+        result.setText("TBA");
         result.setStyle("-fx-text-fill: #4a5a8a; -fx-font-size: 10px;");
     }
 

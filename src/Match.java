@@ -1,5 +1,3 @@
-package src;
-
 public class Match {
     private Match leftChild;
     private Match rightChild;
@@ -96,8 +94,8 @@ public void forceSetResult(Team winner, String score) {
 
     @Override
     public String toString() {
-        String t1 = (team1 == null) ? "TBD" : team1.getName();
-        String t2 = (team2 == null) ? "TBD" : team2.getName();
+        String t1 = (team1 == null) ? "TBA" : team1.getName();
+        String t2 = (team2 == null) ? "TBA" : team2.getName();
         String tag = isPlayInGrandFinal ? "[PI-GF]"
                    : isPlayIn          ? "[PI]"
                    : isMainBracket     ? "[MAIN]"

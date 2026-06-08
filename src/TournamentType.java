@@ -1,5 +1,3 @@
-package src;
-
 public enum TournamentType {
     SINGLE_ELIMINATION("Single Elimination"),
     DOUBLE_ELIMINATION("Double Elimination"),

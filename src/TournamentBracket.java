@@ -1,5 +1,3 @@
-package src;
-
 import java.util.*;
 
 public class TournamentBracket {
@@ -1239,7 +1237,7 @@ public class TournamentBracket {
         int mainRoundBase = lbRoundNum + 1;
         int mainSize      = numByeTeams * 2;   // 4 or 8
 
-        // Build round-1 main bracket matches — each pairs 1 bye seed vs 1 PI survivor (TBD)
+        // Build round-1 main bracket matches — each pairs 1 bye seed vs 1 PI survivor (TBA)
         // Seeding: top seed faces weakest survivor (reverse pairing)
         List<Match> mainCurrent = new ArrayList<>();
         playInSlots = new ArrayList<>();
@@ -1506,7 +1504,7 @@ public class TournamentBracket {
 
         // Use seeded bracket ordering for mainSize
         int[] seedOrder = buildSeedOrder(mainSize);
-        // Map seed position → mainSlotTeam (null = play-in survivor TBD)
+        // Map seed position → mainSlotTeam (null = play-in survivor TBA)
         Team[] orderedSlots = new Team[mainSize];
         for (int i = 0; i < mainSize; i++) {
             int s = seedOrder[i];
@@ -1602,38 +1600,187 @@ public class TournamentBracket {
     // =========================================================================
 
     private void buildRoundRobin(Team[] teams) {
-        this.totalRounds = 1;
+        int n = teams.length;
         allMatches.clear();
-        for (int i = 0; i < teams.length; i++)
-            for (int j = i + 1; j < teams.length; j++) {
-                Match m = new Match(1);
-                m.setTeam1(teams[i]);
-                m.setTeam2(teams[j]);
-                allMatches.add(m);
+
+        // If n is odd, add a dummy null slot so the circle algorithm works cleanly.
+        // The match involving the null slot is simply skipped (that team has a bye).
+        int size = (n % 2 == 0) ? n : n + 1;
+        Team[] circle = new Team[size];
+        for (int i = 0; i < n; i++) circle[i] = teams[i];
+        // circle[size-1] == null when n is odd
+
+        int numRounds = size - 1;
+        this.totalRounds = numRounds;
+
+        int matchId = 1;
+        for (int round = 1; round <= numRounds; round++) {
+            // Pair position 0 vs size/2, then 1 vs size-1, 2 vs size-2, …
+            for (int i = 0; i < size / 2; i++) {
+                Team t1 = circle[i];
+                Team t2 = circle[size - 1 - i];
+                if (t1 != null && t2 != null) {
+                    Match m = new Match(round);
+                    m.setMatchId(matchId++);
+                    m.setTeam1(t1);
+                    m.setTeam2(t2);
+                    allMatches.add(m);
+                }
             }
+            // Rotate: keep circle[0] fixed, rotate the rest one step clockwise
+            Team last = circle[size - 1];
+            for (int i = size - 1; i > 1; i--) circle[i] = circle[i - 1];
+            circle[1] = last;
+        }
+
         this.root = null;
+        System.out.println("Round Robin built: " + n + " teams, " + numRounds
+            + " rounds, " + allMatches.size() + " matches");
     }
 
     // =========================================================================
     // SWISS SYSTEM
     // =========================================================================
 
+    // =========================================================================
+    // SWISS SYSTEM — lazy round generation
+    //
+    // Only Round 1 is generated at construction time.
+    // Call generateNextSwissRound() after every round's matches are all complete
+    // to produce the next round's standings-based pairings.
+    //
+    // Pairing order (each round):
+    //   1. Sort teams by wins DESC, Buchholz DESC, point-differential DESC
+    //   2. Greedily pair adjacent teams, skipping rematches with a look-ahead swap
+    //   3. If a team is left over (odd count), give a bye (1 win, no score recorded)
+    //
+    // Rounds per team count: 4-8 = 3, 9-16 = 4, 17-20 = 5
+    // =========================================================================
+
+    private int swissCurrentRound = 0;
+
     private void buildSwissSystem(Team[] teams) {
-        this.totalRounds = Math.min(5, teams.length / 2);
+        int numTeams = teams.length;
+
+        if      (numTeams <=  8) this.totalRounds = 3;
+        else if (numTeams <= 16) this.totalRounds = 4;
+        else                     this.totalRounds = 5;
+
         allMatches.clear();
-        List<Team> shuffled = new ArrayList<>(Arrays.asList(teams));
-        Collections.shuffle(shuffled);
-        for (int r = 1; r <= totalRounds; r++) {
-            for (int i = 0; i + 1 < shuffled.size(); i += 2) {
-                Match m = new Match(r);
-                m.setTeam1(shuffled.get(i));
-                m.setTeam2(shuffled.get(i + 1));
-                allMatches.add(m);
-            }
-            Collections.shuffle(shuffled);
-        }
+        swissCurrentRound = 0;
         this.root = null;
+
+        generateNextSwissRound();
+
+        System.out.println("Swiss System built: " + numTeams + " teams, "
+            + totalRounds + " rounds planned, R1 matches=" + allMatches.size());
     }
+
+    /**
+     * Returns true if all matches in the current Swiss round are complete
+     * and there are still rounds left to generate.
+     */
+    public boolean canGenerateNextSwissRound() {
+        if (swissCurrentRound >= totalRounds) return false;
+        if (swissCurrentRound == 0) return false;
+        List<Match> current = getMatchesByRound(swissCurrentRound);
+        if (current.isEmpty()) return false;
+        for (Match m : current) if (!m.isCompleted()) return false;
+        return true;
+    }
+
+    /**
+     * Generates the next Swiss round's pairings based on current standings.
+     * Called at construction (R1) and after each round completes.
+     */
+    public void generateNextSwissRound() {
+        if (swissCurrentRound >= totalRounds) return;
+        swissCurrentRound++;
+        int round = swissCurrentRound;
+
+        List<Team> sorted = new ArrayList<>(Arrays.asList(teams));
+
+        // Round 1: shuffle for variety; subsequent rounds: standings-based
+        if (round == 1) {
+            Collections.shuffle(sorted);
+        } else {
+            sorted.sort((a, b) -> {
+                int wDiff = Integer.compare(b.getWins(), a.getWins());
+                if (wDiff != 0) return wDiff;
+                int bDiff = Integer.compare(buchholz(b), buchholz(a));
+                if (bDiff != 0) return bDiff;
+                return Integer.compare(b.getPointDifference(), a.getPointDifference());
+            });
+        }
+
+        List<Team> unpaired = new ArrayList<>(sorted);
+        List<int[]> pairs   = new ArrayList<>();
+
+        while (unpaired.size() >= 2) {
+            Team t1 = unpaired.remove(0);
+            boolean paired = false;
+            for (int j = 0; j < unpaired.size(); j++) {
+                Team t2 = unpaired.get(j);
+                if (!havePlayedBefore(t1, t2)) {
+                    unpaired.remove(j);
+                    pairs.add(new int[]{ indexOf(t1), indexOf(t2) });
+                    paired = true;
+                    break;
+                }
+            }
+            // Every remaining opponent is a rematch — take closest anyway
+            if (!paired && !unpaired.isEmpty()) {
+                Team t2 = unpaired.remove(0);
+                pairs.add(new int[]{ indexOf(t1), indexOf(t2) });
+            }
+        }
+
+        // Bye for odd team count — create a bye match (team1 wins automatically)
+        if (!unpaired.isEmpty()) {
+            Team bye = unpaired.get(0);
+            Match byeMatch = new Match(round);
+            byeMatch.setTeam1(bye);
+            byeMatch.setWinner(bye, 1, 0); // auto-complete: bye = 1-0 win
+            allMatches.add(byeMatch);
+            System.out.println("Swiss R" + round + " BYE: " + bye.getName());
+        }
+
+        for (int[] p : pairs) {
+            Match m = new Match(round);
+            m.setTeam1(teams[p[0]]);
+            m.setTeam2(teams[p[1]]);
+            allMatches.add(m);
+        }
+
+        System.out.println("Swiss R" + round + " generated: " + pairs.size() + " matches");
+    }
+
+    /** Buchholz = sum of all opponents' current wins */
+    private int buchholz(Team t) {
+        int sum = 0;
+        for (Match m : allMatches) {
+            if (!m.isCompleted()) continue;
+            if (m.getTeam1() == t && m.getTeam2() != null) sum += m.getTeam2().getWins();
+            else if (m.getTeam2() == t && m.getTeam1() != null) sum += m.getTeam1().getWins();
+        }
+        return sum;
+    }
+
+    private boolean havePlayedBefore(Team a, Team b) {
+        for (Match m : allMatches) {
+            if ((m.getTeam1() == a && m.getTeam2() == b)
+             || (m.getTeam1() == b && m.getTeam2() == a)) return true;
+        }
+        return false;
+    }
+
+    private int indexOf(Team t) {
+        for (int i = 0; i < teams.length; i++) if (teams[i] == t) return i;
+        return -1;
+    }
+
+    public int getSwissCurrentRound() { return swissCurrentRound; }
+
 
     // =========================================================================
     // FREE FOR ALL
@@ -1864,9 +2011,8 @@ public class TournamentBracket {
             if (teams[i] == match.getTeam2()) id2 = i;
         }
         if (id1 >= 0 && id2 >= 0) {
-            int s1 = (match.getTeam1() == winner) ? score1 : score2;
-            int s2 = (match.getTeam2() == winner) ? score1 : score2;
-            scoreMatrix.recordMatch(id1, id2, s1, s2);
+            // score1 is always team1's score, score2 is always team2's score — no swap needed
+            scoreMatrix.recordMatch(id1, id2, score1, score2);
         }
 
         if (tournamentType == TournamentType.SINGLE_ELIMINATION
