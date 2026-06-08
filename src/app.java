@@ -302,7 +302,7 @@ public class app extends Application {
             if (!name.isEmpty()) {
                 int maxAllowed = getMaxTeamsAllowed(bracketTypeCombo.getValue());
                 if (teams.length >= maxAllowed) {
-                    showAlert("Team Limit Reached", "Maximum of " + maxAllowed + " teams allowed for " + bracketTypeCombo.getValue() + ".");
+                    showAlert("Team Limit Reached", "Maximum of " + maxAllowed + " teams allowed.");
                 } else {
                     Team[] newTeams = new Team[teams.length + 1];
                     System.arraycopy(teams, 0, newTeams, 0, teams.length);
@@ -599,7 +599,7 @@ public class app extends Application {
             case "Swiss System":
                 return n >= 4 && n <= 20;
             case "Free For All":
-                return n >= 4;
+                return n >= 4 && n <= 12;
             default:
                 return n >= 4;
         }
@@ -610,6 +610,7 @@ public class app extends Application {
         switch (bracketType) {
             case "Round Robin":  return 8;
             case "Swiss System": return 20;
+            case "Free For All": return 12;
             default:             return 32;
         }
     }
@@ -917,7 +918,7 @@ public class app extends Application {
     // =========================================================================
 
     private String getNotReadyMessage(int n, String type) {
-    if (n == 0) return "Single Elimination (4, 8, 16, 32) \nDouble Elimination (4, 8, 16, 32) \nPlay-in SE (12, 24) \nPlay-in DE (12, 24) \nRound Robin (3–8 teams) \nSwiss System (4–20 teams) \nFree For All requires at least 4 teams.";
+    if (n == 0) return "Single Elimination (4, 8, 16, 32) \nDouble Elimination (4, 8, 16, 32) \nPlay-in SE (12, 24) \nPlay-in DE (12, 24) \nRound Robin (3–8 teams) \nSwiss System (4–20 teams) \nFree For All (4–12 teams).";
     
     if ("Single Elimination".equals(type)) {
         if (n < 4) return "Need at least 4 Participants for Single Elimination.";
@@ -957,6 +958,7 @@ public class app extends Application {
     
     if ("Free For All".equals(type)) {
         if (n < 4) return "Need at least 4 teams for Free For All.";
+        if (n > 12) return "Free For All supports a maximum of 12 teams.\nCurrent: " + n;
         return "";
     }
     if ("Round Robin".equals(type)) {
