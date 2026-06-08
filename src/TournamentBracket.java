@@ -2002,6 +2002,10 @@ public class TournamentBracket {
             System.out.println("Error: Match missing a team!");
             return;
         }
+        if (score1 == score2) {
+            System.out.println("Error: Tied scores (" + score1 + "-" + score2 + ") are not allowed. Match not recorded.");
+            return;
+        }
         match.setWinner(winner, score1, score2);
 
         // Record scores in the matrix using team array index as ID
@@ -2028,21 +2032,82 @@ public class TournamentBracket {
 
     public ScoreMatrix getScoreMatrix() { return scoreMatrix; }
 
-    public void revertMatch(Match match, String winnerId, String score) {
-    if (winnerId == null) {
-        // Match was incomplete in the snapshot — wipe its result
-        match.clearResult();
-    } else {
-        // Match was completed — find the winner by name and restore it
-        Team winner = null;
-        for (Team t : teams) {
-            if (t.getName().equals(winnerId)) { winner = t; break; }
-        }
-        if (winner != null) {
-            match.forceSetResult(winner, score);
+    /** Clears the entire score matrix (all matches revert to "not played"). */
+    public void clearScoreMatrix() {
+        for (int i = 0; i < teams.length; i++)
+            for (int j = 0; j < teams.length; j++)
+                scoreMatrix.clearMatch(i, j);
+    }
+
+    /** Public wrapper for recalculateTeamStats — used by the undo system in app.java. */
+    public void recalculateAllTeamStats() {
+        recalculateTeamStats();
+    }
+
+    /**
+     * Resets every team's win, loss, and point-difference counters to zero,
+     * then replays all completed matches to rebuild the correct totals.
+     * Call this after any undo/revert operation.
+     */
+    private void recalculateTeamStats() {
+        for (Team t : teams) t.resetStats();
+        for (Match m : allMatches) {
+            if (!m.isCompleted() || m.getWinner() == null) continue;
+            Team winner = m.getWinner();
+            Team loser  = (m.getTeam1() == winner) ? m.getTeam2() : m.getTeam1();
+            if (loser == null) continue;
+            if (m.getScore() != null) {
+                try {
+                    String[] parts = m.getScore().split("-");
+                    int s1 = Integer.parseInt(parts[0].trim());
+                    int s2 = Integer.parseInt(parts[1].trim());
+                    // s1 is always team1's score, s2 is always team2's score
+                    boolean winnerIsTeam1 = (m.getTeam1() == winner);
+                    int winnerScore = winnerIsTeam1 ? s1 : s2;
+                    int loserScore  = winnerIsTeam1 ? s2 : s1;
+                    winner.addWin(winnerScore, loserScore);
+                    loser.addLoss(loserScore, winnerScore);
+                } catch (Exception ignored) {
+                    // Fallback: no score data, just count the win/loss with zeros
+                    winner.addWin(0, 0);
+                    loser.addLoss(0, 0);
+                }
+            }
         }
     }
-}
+
+    public void revertMatch(Match match, String winnerId, String score) {
+        if (winnerId == null) {
+            // Match was incomplete in the snapshot — wipe its result
+            match.clearResult();
+        } else {
+            // Match was completed — find the winner by name and restore it
+            Team winner = null;
+            for (Team t : teams) {
+                if (t.getName().equals(winnerId)) { winner = t; break; }
+            }
+            if (winner != null) {
+                match.forceSetResult(winner, score);
+                // Re-record in the score matrix
+                int id1 = -1, id2 = -1;
+                for (int i = 0; i < teams.length; i++) {
+                    if (teams[i] == match.getTeam1()) id1 = i;
+                    if (teams[i] == match.getTeam2()) id2 = i;
+                }
+                if (id1 >= 0 && id2 >= 0 && score != null) {
+                    try {
+                        String[] parts = score.split("-");
+                        int s1 = Integer.parseInt(parts[0].trim());
+                        int s2 = Integer.parseInt(parts[1].trim());
+                        scoreMatrix.recordMatch(id1, id2, s1, s2);
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+        // Note: call recalculateAllTeamStats() once after ALL matches are reverted
+        // (done by performUndo in app.java) rather than here per-match,
+        // to avoid counting partial state during the undo loop.
+    }
 
     private void propagateWinnerUp(Match currentMatch, Team winner) {
         Team loser = (currentMatch.getTeam1() == winner)

@@ -26,9 +26,21 @@ public class ScoreMatrix {
         System.out.println("Warning: A team cannot play against itself.");
         return;
     }
+    if (scoreA == scoreB) {
+        System.out.println("Warning: Tied scores are not allowed (" + scoreA + "-" + scoreB + "). Match not recorded.");
+        return;
+    }
     scores[teamAId][teamBId] = scoreA;
     scores[teamBId][teamAId] = scoreB;
 }
+
+    // CLEAR A MATCH RESULT (revert to "not played")
+    public void clearMatch(int teamAId, int teamBId) {
+        if (teamAId >= 0 && teamAId < size && teamBId >= 0 && teamBId < size) {
+            scores[teamAId][teamBId] = -1;
+            scores[teamBId][teamAId] = -1;
+        }
+    }
 
     // GET SCORE WHEN TEAM A PLAYED TEAM B
     public int getScore(int teamAId, int teamBId) {

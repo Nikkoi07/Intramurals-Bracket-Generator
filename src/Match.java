@@ -67,10 +67,17 @@ public class Match {
         this.score = score1 + "-" + score2;
         this.completed = true;
 
+        // score1 is always team1's score, score2 is always team2's score.
+        // Each team must receive their OWN score as "scoreFor" and opponent's as "scoreAgainst".
         Team loser = (team1 == winner) ? team2 : team1;
         if (loser != null) {
-            winner.addWin(score1, score2);
-            loser.addLoss(score1, score2);
+            if (winner == team1) {
+                winner.addWin(score1, score2);   // team1 won:  for=score1, against=score2
+                loser.addLoss(score2, score1);   // team2 lost: for=score2, against=score1
+            } else {
+                winner.addWin(score2, score1);   // team2 won:  for=score2, against=score1
+                loser.addLoss(score1, score2);   // team1 lost: for=score1, against=score2
+            }
         }
     }
 
@@ -80,17 +87,17 @@ public class Match {
     }
 
     public void clearResult() {
-    this.winner    = null;
-    this.score     = null;
-    this.completed = false;
-}
+        this.winner    = null;
+        this.score     = null;
+        this.completed = false;
+    }
 
-/** Restores a previously recorded result without triggering propagation. */
-public void forceSetResult(Team winner, String score) {
-    this.winner    = winner;
-    this.score     = score;
-    this.completed = true;
-}
+    /** Restores a previously recorded result without triggering propagation. */
+    public void forceSetResult(Team winner, String score) {
+        this.winner    = winner;
+        this.score     = score;
+        this.completed = true;
+    }
 
     @Override
     public String toString() {

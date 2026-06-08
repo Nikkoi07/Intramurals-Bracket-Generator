@@ -49,6 +49,13 @@ public class Team {
         return (wins * 100.0) / total;
     }
     
+    public void resetStats() {
+        this.wins = 0;
+        this.losses = 0;
+        this.pointsScored = 0;
+        this.pointsAllowed = 0;
+    }
+
     public void addWin(int scoreFor, int scoreAgainst) {
         this.wins++;
         this.pointsScored += scoreFor;

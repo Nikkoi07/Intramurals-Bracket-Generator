@@ -73,11 +73,22 @@ public class app extends Application {
         Map<Integer, MatchSnapshot> snapMap = new HashMap<>();
         for (MatchSnapshot s : frame) snapMap.put(s.matchId, s);
 
+        // Clear all matches first so score matrix and team stats are in a clean state
+        for (Match m : tournament.getAllMatches()) {
+            m.clearResult();
+        }
+        // Clear score matrix completely before replaying
+        tournament.clearScoreMatrix();
+
+        // Now restore each match to its snapshot state
         for (Match m : tournament.getAllMatches()) {
             MatchSnapshot s = snapMap.get(m.getMatchId());
             if (s == null) continue;
             tournament.revertMatch(m, s.winnerId, s.score);
         }
+
+        // Recalculate team stats once after all matches are restored
+        tournament.recalculateAllTeamStats();
 
         updateBracketView();
         updateProgress();
@@ -2392,10 +2403,25 @@ public class app extends Application {
         // Standings grid
         GridPane grid = makeStandingsGrid(new String[]{"Rank","Team","Wins","Losses","Pts Scored","Pts Allowed"}, "#040D43");
         List<Team> sorted = new ArrayList<>(Arrays.asList(teams));
+        ScoreMatrix ffaSm = tournament.getScoreMatrix();
+        // Build a team → index map for ScoreMatrix lookups
+        Map<Team, Integer> ffaIdx = new HashMap<>();
+        for (int i = 0; i < teams.length; i++) ffaIdx.put(teams[i], i);
         sorted.sort((a, b) -> {
+            // 1st: most wins
             int wDiff = Integer.compare(b.getWins(), a.getWins());
             if (wDiff != 0) return wDiff;
-            return Integer.compare(b.getPointsScored(), a.getPointsScored());
+            // 2nd: most points scored
+            int idxA = ffaIdx.getOrDefault(a, -1);
+            int idxB = ffaIdx.getOrDefault(b, -1);
+            int psA = (idxA >= 0) ? ffaSm.getTotalPointsScored(idxA) : 0;
+            int psB = (idxB >= 0) ? ffaSm.getTotalPointsScored(idxB) : 0;
+            int psDiff = Integer.compare(psB, psA);
+            if (psDiff != 0) return psDiff;
+            // 3rd: fewest points allowed
+            int paA = (idxA >= 0) ? ffaSm.getTotalPointsAllowed(idxA) : 0;
+            int paB = (idxB >= 0) ? ffaSm.getTotalPointsAllowed(idxB) : 0;
+            return Integer.compare(paA, paB);
         });
         for (int i = 0; i < sorted.size(); i++) {
             Team t = sorted.get(i);
@@ -2932,8 +2958,11 @@ private void showGridScoreMatrix() {
                     cell = new Label(String.valueOf(score));
                     int opp = sm.getScore(j, i);
                     boolean won = score > opp;
-                    cell.setStyle(playedStyle +
-                        (won ? "-fx-text-fill: #FFBA09; -fx-font-weight: bold;" : ""));
+                    boolean tied = score == opp;
+                    String cellExtra = won  ? "-fx-text-fill: #FFBA09; -fx-font-weight: bold;"
+                                     : tied ? "-fx-text-fill: #e74c3c; -fx-font-weight: bold;"
+                                     :        "";
+                    cell.setStyle(playedStyle + cellExtra);
                 }
             }
             cell.setMinWidth(55); cell.setMaxWidth(55);
