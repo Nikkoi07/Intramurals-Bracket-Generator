@@ -539,6 +539,7 @@ public class app extends Application {
             showAlert("Simulate", "No pending matches to simulate.");
             return;
         }
+        pushUndoState();
         for (Match m : pending) {
             int s1, s2;
             do {
@@ -2152,67 +2153,30 @@ public class app extends Application {
 
         // ── Standings table ───────────────────────────────────────────────
         // Standard tiebreaker order:
-        //   1. Wins  2. Head-to-Head (among tied group)  3. Point Difference  4. Points Scored
+        //   1. Wins    2. Winrate 3. Point Differential
         GridPane grid = makeStandingsGrid(new String[]{"Rank","Team","Wins","Losses","Win %","PD"}, "#040D43");
         List<Team> sorted = new ArrayList<>(Arrays.asList(teams));
-        ScoreMatrix matrix = tournament.getScoreMatrix();
+        
 
         // Build team-index lookup (team object → index in original teams array)
         Map<Team, Integer> teamIndex = new HashMap<>();
         for (int i = 0; i < teams.length; i++) teamIndex.put(teams[i], i);
 
         sorted.sort((a, b) -> {
-            // 1. Most wins first
-            int wCmp = Integer.compare(b.getWins(), a.getWins());
-            if (wCmp != 0) return wCmp;
+        // 1. Win % (higher is better)
+        int wCmp = Double.compare(b.getWinPercentage(), a.getWinPercentage());
+        if (wCmp != 0) return wCmp;
 
-            // 2. Head-to-head among all teams tied on wins
-            //    Collect the full tied group for team a (same win count)
-            List<Team> tiedGroup = new ArrayList<>();
-            for (Team t : teams) if (t.getWins() == a.getWins()) tiedGroup.add(t);
+        // 2. Point Difference (higher is better)
+        int pdCmp = Integer.compare(b.getPointDifference(), a.getPointDifference());
+        if (pdCmp != 0) return pdCmp;
 
-            if (tiedGroup.size() >= 2 && tiedGroup.contains(a) && tiedGroup.contains(b)) {
-                // Count wins each team has against the others in the tied group
-                int aH2HWins = 0, bH2HWins = 0;
-                for (Team t : tiedGroup) {
-                    if (t == a || t == b) continue;
-                    Integer idxA = teamIndex.get(a), idxT = teamIndex.get(t);
-                    Integer idxB = teamIndex.get(b);
-                    if (idxA != null && idxT != null && matrix.hasPlayed(idxA, idxT)) {
-                        if (matrix.getScore(idxA, idxT) > matrix.getScore(idxT, idxA)) aH2HWins++;
-                    }
-                    if (idxB != null && idxT != null && matrix.hasPlayed(idxB, idxT)) {
-                        if (matrix.getScore(idxB, idxT) > matrix.getScore(idxT, idxB)) bH2HWins++;
-                    }
-                }
-                // Direct head-to-head between a and b
-                Integer idxA = teamIndex.get(a), idxB2 = teamIndex.get(b);
-                if (idxA != null && idxB2 != null && matrix.hasPlayed(idxA, idxB2)) {
-                    int sA = matrix.getScore(idxA, idxB2);
-                    int sB = matrix.getScore(idxB2, idxA);
-                    if (sA > sB) aH2HWins++;
-                    else if (sB > sA) bH2HWins++;
-                }
-                int h2hCmp = Integer.compare(bH2HWins, aH2HWins);
-                if (h2hCmp != 0) return h2hCmp;
-            }
-
-            // 3. Point difference (higher is better)
-            int pdCmp = Integer.compare(b.getPointDifference(), a.getPointDifference());
-            if (pdCmp != 0) return pdCmp;
-
-            // 4. Total points scored (higher is better)
-            Integer idxA = teamIndex.get(a), idxB = teamIndex.get(b);
-            int psA = (idxA != null) ? matrix.getTotalPointsScored(idxA) : 0;
-            int psB = (idxB != null) ? matrix.getTotalPointsScored(idxB) : 0;
-            int psCmp = Integer.compare(psB, psA);
-            if (psCmp != 0) return psCmp;
-
-            // 5. Stable fallback: original seeding order (ensures all teams always render)
-            int seedA = (idxA != null) ? idxA : 0;
-            int seedB = (idxB != null) ? idxB : 0;
-            return Integer.compare(seedA, seedB);
-        });
+        // 3. Stable fallback: original seeding order
+        Integer idxA = teamIndex.get(a), idxB = teamIndex.get(b);
+        int seedA = (idxA != null) ? idxA : 0;
+        int seedB = (idxB != null) ? idxB : 0;
+        return Integer.compare(seedA, seedB);
+    });
 
         // Assign ranks — teams still tied after all 4 criteria share the same rank
         // gridRow always increments so every team occupies its own GridPane row
@@ -2220,13 +2184,11 @@ public class app extends Application {
         for (int i = 0; i < sorted.size(); i++) {
             if (i > 0) {
                 Team prev = sorted.get(i - 1), curr = sorted.get(i);
-                Integer idxP = teamIndex.get(prev), idxC = teamIndex.get(curr);
-                boolean sameW  = prev.getWins() == curr.getWins();
-                boolean samePD = prev.getPointDifference() == curr.getPointDifference();
-                boolean samePS = (idxP != null && idxC != null)
-                    && matrix.getTotalPointsScored(idxP) == matrix.getTotalPointsScored(idxC);
-                if (!(sameW && samePD && samePS)) rank = i + 1;
+                boolean sameWinPct = Double.compare(prev.getWinPercentage(), curr.getWinPercentage()) == 0;
+                boolean samePD     = prev.getPointDifference() == curr.getPointDifference();
+                if (!(sameWinPct && samePD)) rank = i + 1;
             }
+
             int gridRow = i + 1; // always unique — prevents rows overwriting each other
             Team t = sorted.get(i);
             addStandingsRow(grid, gridRow, new String[]{
