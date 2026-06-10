@@ -6,7 +6,7 @@
             "name": "Run JavaFX App",
             "request": "launch",
             "mainClass": "app",
-            "vmArgs": "--module-path \"C:/Users/james/Downloads/javafx-sdk-17.0.19/lib\" --add-modules javafx.controls,javafx.fxml"
+            "vmArgs": "--module-path \"C:/Users/james/Documents/Projects/javafx-sdk-17.0.19/lib\" --add-modules javafx.controls,javafx.fxml"
         }
     ]
 }
