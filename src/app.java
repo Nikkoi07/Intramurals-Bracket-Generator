@@ -576,14 +576,11 @@ public class app extends Application {
     // =========================================================================
 
     private String resolveActualType(String selectedType, int teamCount) {
-        if ("Single Elimination".equals(selectedType) && teamCount == 12) {
+        if ("Play-ins SE".equals(selectedType)) {
             return "Single Elimination";
         }
-        if ("Double Elimination".equals(selectedType) && teamCount == 12) {
-            return "Double Elimination";
-        }
-        if ("Double Elimination".equals(selectedType) && !isPowerOfTwo(teamCount) && teamCount != 24) {
-            return "Play-In Double Elimination";
+        if ("Play-ins DE".equals(selectedType)) {
+            return (teamCount == 12) ? "Double Elimination" : "Double Elimination";
         }
         return selectedType;
     }
@@ -592,9 +589,13 @@ public class app extends Application {
         if (n == 0) return false;
         switch (bracketType) {
             case "Single Elimination":
-                return n == 4 || n == 8 || n == 12 || n == 16 || n == 24 || n == 32;
+                return n == 4 || n == 8 || n == 16 || n == 32;
             case "Double Elimination":
-                return (isPowerOfTwo(n) && n >= 4 && n <= 32) || n == 24 || n == 12;
+                return isPowerOfTwo(n) && n >= 4 && n <= 32;
+            case "Play-ins SE":
+                return n == 12 || n == 24;
+            case "Play-ins DE":
+                return n == 12 || n == 24;
             case "Round Robin":
                 return n >= 3 && n <= 8;
             case "Swiss System":
@@ -612,6 +613,8 @@ public class app extends Application {
             case "Round Robin":  return 8;
             case "Swiss System": return 20;
             case "Free For All": return 12;
+            case "Play-ins SE":  return 24;
+            case "Play-ins DE":  return 24;
             default:             return 32;
         }
     }
@@ -730,6 +733,8 @@ public class app extends Application {
         bracketTypeCombo.getItems().addAll(
             "Single Elimination",
             "Double Elimination",
+            "Play-ins SE",
+            "Play-ins DE",
             "Round Robin",
             "Swiss System",
             "Free For All"
@@ -919,40 +924,38 @@ public class app extends Application {
     // =========================================================================
 
     private String getNotReadyMessage(int n, String type) {
-    if (n == 0) return "Single Elimination (4, 8, 16, 32) \nDouble Elimination (4, 8, 16, 32) \nPlay-in SE (12, 24) \nPlay-in DE (12, 24) \nRound Robin (3–8 teams) \nSwiss System (4–20 teams) \nFree For All (4–12 teams).";
+    if (n == 0) return "Single Elimination (4, 8, 16, 32) \nDouble Elimination (4, 8, 16, 32) \nPlay-ins SE (12, 24) \nPlay-ins DE (12, 24) \nRound Robin (3–8 teams) \nSwiss System (4–20 teams) \nFree For All (4–12 teams).";
     
     if ("Single Elimination".equals(type)) {
         if (n < 4) return "Need at least 4 Participants for Single Elimination.";
-        
-        // Custom prompts for 12 and 24 Team Play-in brackets
-        if (n > 8 && n < 12) {
-            return "Add " + (12 - n) + " more team(s) to reach 12 Team Play-in SE.\n(Valid: 12, 24)";
-        }
-        if (n > 16 && n < 24) {
-            return "Add " + (24 - n) + " more team(s) to reach 24 Team Play-in SE.\n(Valid: 12, 24)";
-        }
-
-        int[] valid = {4, 8, 12, 16, 24, 32};
+        int[] valid = {4, 8, 16, 32};
         for (int v : valid) {
             if (n == v) return "";
             if (v > n)  return "Add " + (v - n) + " more team(s) to reach " + v + " teams.\n(Valid: 4, 8, 16, 32)";
         }
         return "Single Elimination supports 4, 8, 16, or 32 teams.\nCurrent: " + n;
     }
+
+    if ("Play-ins SE".equals(type)) {
+        if (n < 12) return "Add " + (12 - n) + " more team(s) to reach 12 teams.\n(Valid: 12, 24)";
+        if (n == 12) return "";
+        if (n < 24) return "Add " + (24 - n) + " more team(s) to reach 24 teams.\n(Valid: 12, 24)";
+        if (n == 24) return "";
+        return "Play-ins SE supports 12 or 24 teams.\nCurrent: " + n;
+    }
+
+    if ("Play-ins DE".equals(type)) {
+        if (n < 12) return "Add " + (12 - n) + " more team(s) to reach 12 teams.\n(Valid: 12, 24)";
+        if (n == 12) return "";
+        if (n < 24) return "Add " + (24 - n) + " more team(s) to reach 24 teams.\n(Valid: 12, 24)";
+        if (n == 24) return "";
+        return "Play-ins DE supports 12 or 24 teams.\nCurrent: " + n;
+    }
     
     if ("Double Elimination".equals(type)) {
         if (n < 4)  return "Need at least 4 teams for Double Elimination.";
-        
-        // Custom prompts for 12 and 24 Team Play-in brackets
-        if (n > 8 && n < 12) {
-            return "Add " + (12 - n) + " more team(s) to reach 12 Team Play-in DE.\n(Valid: 12, 24)";
-        }
-        if (n > 16 && n < 24) {
-            return "Add " + (24 - n) + " more team(s) to reach 24 Team Play-in DE.\n(Valid: 12, 24)";
-        }
-
-        if (isPowerOfTwo(n) || n == 24 || n == 12) return "";
-        int[] valid = {4, 8, 12, 16, 24, 32};
+        if (isPowerOfTwo(n)) return "";
+        int[] valid = {4, 8, 16, 32};
         for (int v : valid) if (v > n) return "Add " + (v - n) + " more team(s) for " + v + "-team Double Elimination.\n(Valid: 4, 8, 16, 32)";
         return "Double Elimination supports 4, 8, 16, 32 teams.\nCurrent: " + n;
     }
@@ -1016,14 +1019,18 @@ public class app extends Application {
 
     switch (currentType) {
         case "Single Elimination":
-            if (teams.length == 12) displaySingleElimination12();
-            else displaySingleElimination();
+            displaySingleElimination();
             break;
         case "Double Elimination":
+            displayDoubleElimination();
+            break;
+        case "Play-ins SE":
+            if (teams.length == 12) displaySingleElimination12();
+            else displaySingleElimination(); // 24-team falls through to generic SE with play-in logic
+            break;
+        case "Play-ins DE":
             if (teams.length == 12) displayDoubleElimination12();
-            else if (teams.length == 6 || teams.length == 10
-                    || teams.length == 20) displayPlayInDE();
-            else displayDoubleElimination();
+            else displayDoubleElimination(); // 24-team
             break;
         case "Round Robin":  displayRoundRobin();  break;
         case "Swiss System": displaySwissSystem();  break;
@@ -1822,240 +1829,7 @@ public class app extends Application {
     Team champion = tournament.getTournamentWinner();
     if (champion != null) addChampionDisplay(champion);
 }
-    // =========================================================================
-    // PLAY-IN DOUBLE ELIMINATION
-    // Only renders play-in sections (WB / LB / GF) when they actually have matches.
-    // =========================================================================
 
-    private void displayPlayInDE() {
-        final double CARD_W      = 180;
-        final double CARD_H      = 68;
-        final double CARD_MID    = CARD_H / 2.0;
-        final double COL_GAP     = 70;
-        final double MATCH_V_GAP = 25;
-        final double TOP_PAD     = 30;
-        final double SECTION_GAP = 120;
-
-        // ── Gather play-in WB matches ─────────────────────────────────
-        int piWbRounds = tournament.getPlayInWinnersRounds();
-        Map<Integer, List<Match>> piWbByRound = new HashMap<>();
-        for (int r = 1; r <= piWbRounds; r++) {
-            List<Match> ms = tournament.getPlayInWinnersMatchesByRound(r);
-            if (!ms.isEmpty()) piWbByRound.put(r, ms);
-        }
-        boolean hasPiWb = !piWbByRound.isEmpty();
-
-        // ── Gather play-in LB matches ─────────────────────────────────
-        Map<Integer, List<Match>> piLbByRound = new HashMap<>();
-        for (Match m : tournament.getLosersBracketMatches())
-            if (m.isPlayIn()) piLbByRound.computeIfAbsent(m.getRound(), k -> new ArrayList<>()).add(m);
-        boolean hasPiLb = !piLbByRound.isEmpty();
-
-        List<Integer> piLbRounds = new ArrayList<>(piLbByRound.keySet());
-        java.util.Collections.sort(piLbRounds);
-        Map<Integer, Integer> piLbRoundToCol = new HashMap<>();
-        for (int i = 0; i < piLbRounds.size(); i++) piLbRoundToCol.put(piLbRounds.get(i), i);
-
-        Match piGF = tournament.getPlayInGrandFinal();
-        boolean hasPiGF = piGF != null;
-
-
-        int totalPiCols = Math.max(hasPiWb ? piWbRounds : 0, hasPiLb ? piLbRounds.size() : 0);
-        double colStride = CARD_W + COL_GAP;
-        double[] colX = new double[Math.max(totalPiCols + 1, 1)];
-        for (int c = 0; c <= totalPiCols; c++) colX[c] = 20 + c * colStride;
-        double piGfX = totalPiCols > 0 ? colX[totalPiCols] : 20;
-
-        // ── Y positions: play-in WB ───────────────────────────────────
-        Map<Match, Double> matchY = new HashMap<>();
-        if (hasPiWb && piWbByRound.containsKey(1)) {
-            List<Match> r1 = piWbByRound.get(1);
-            double slotH = CARD_H + MATCH_V_GAP;
-            for (int i = 0; i < r1.size(); i++) matchY.put(r1.get(i), TOP_PAD + i * slotH);
-        }
-        for (int r = 2; r <= piWbRounds; r++) {
-            List<Match> curr = piWbByRound.get(r);
-            if (curr == null) continue;
-            for (Match m : curr) {
-                Double ly = m.getLeftChild()  != null ? matchY.get(m.getLeftChild())  : null;
-                Double ry = m.getRightChild() != null ? matchY.get(m.getRightChild()) : null;
-                if      (ly != null && ry != null) matchY.put(m, (ly + ry) / 2.0);
-                else if (ly != null)               matchY.put(m, ly);
-                else if (ry != null)               matchY.put(m, ry);
-            }
-        }
-
-        // ── Y positions: play-in LB ───────────────────────────────────
-        double wbMaxY = matchY.values().stream().mapToDouble(Double::doubleValue).max().orElse(0);
-        double lbOffsetY = wbMaxY + (hasPiWb ? CARD_H + SECTION_GAP : TOP_PAD);
-        if (hasPiLb && !piLbRounds.isEmpty()) {
-            List<Match> lr1 = piLbByRound.get(piLbRounds.get(0));
-            if (lr1 != null) {
-                double slotH = CARD_H + MATCH_V_GAP;
-                for (int i = 0; i < lr1.size(); i++) matchY.put(lr1.get(i), lbOffsetY + 60 + i * slotH);
-            }
-            for (int ri = 1; ri < piLbRounds.size(); ri++) {
-                List<Match> curr = piLbByRound.get(piLbRounds.get(ri));
-                if (curr == null) continue;
-                for (Match m : curr) {
-                    Double ly = m.getLeftChild()  != null ? matchY.get(m.getLeftChild())  : null;
-                    Double ry = m.getRightChild() != null ? matchY.get(m.getRightChild()) : null;
-                    if      (ly != null && ry != null) matchY.put(m, (ly + ry) / 2.0);
-                    else if (ly != null)               matchY.put(m, ly);
-                    else if (ry != null)               matchY.put(m, ry);
-                }
-            }
-        }
-
-        // ── Y position: play-in GF ────────────────────────────────────
-        double piLbBotY = matchY.values().stream().mapToDouble(Double::doubleValue).max().orElse(TOP_PAD) + CARD_H;
-        double piGfY    = (TOP_PAD + piLbBotY) / 2.0 - CARD_MID;
-        if (hasPiGF) matchY.put(piGF, piGfY);
-
-        // ── Canvas ────────────────────────────────────────────────────
-        double maxY    = matchY.values().stream().mapToDouble(Double::doubleValue).max().orElse(0);
-        double canvasW = piGfX + CARD_W + 60;
-        double canvasH = maxY + CARD_H + 60;
-
-        Pane pane = new Pane();
-        pane.setPrefSize(canvasW, canvasH);
-        pane.setStyle("-fx-background-color: #040D43;");
-
-        Canvas canvas = new Canvas(canvasW, canvasH);
-        GraphicsContext gc = canvas.getGraphicsContext2D();
-        gc.setLineWidth(2);
-
-        // ── Play-in WB lines (only when play-in WB exists) ───────────
-        if (hasPiWb) {
-            gc.setStroke(Color.web("#FFBA09"));
-            for (int r = 2; r <= piWbRounds; r++) {
-                List<Match> curr = piWbByRound.get(r);
-                if (curr == null) continue;
-                double srcRX = colX[r - 2] + CARD_W, dstLX = colX[r - 1], midX = (srcRX + dstLX) / 2.0;
-                for (Match m : curr) {
-                    if (!matchY.containsKey(m)) continue;
-                    double tgtY = matchY.get(m) + CARD_MID;
-                    drawBracketLine(gc, m.getLeftChild(),  matchY, srcRX, midX, dstLX, tgtY, CARD_MID);
-                    drawBracketLine(gc, m.getRightChild(), matchY, srcRX, midX, dstLX, tgtY, CARD_MID);
-                }
-            }
-        }
-
-        // ── Play-in LB lines (only when play-in LB exists) ───────────
-        if (hasPiLb) {
-            gc.setStroke(Color.web("#FFBA09"));
-            for (int ri = 1; ri < piLbRounds.size(); ri++) {
-                List<Match> currMs = piLbByRound.get(piLbRounds.get(ri - 1));
-                List<Match> nextMs = piLbByRound.get(piLbRounds.get(ri));
-                if (currMs == null || nextMs == null) continue;
-                double srcRX = colX[piLbRoundToCol.get(piLbRounds.get(ri - 1))] + CARD_W;
-                double dstLX = colX[piLbRoundToCol.get(piLbRounds.get(ri))];
-                double midX  = (srcRX + dstLX) / 2.0;
-                for (Match m : nextMs) {
-                    if (!matchY.containsKey(m)) continue;
-                    double tgtY = matchY.get(m) + CARD_MID;
-                    Match lc = m.getLeftChild(), rc = m.getRightChild();
-                    if (lc != null && matchY.containsKey(lc) && currMs.contains(lc))
-                        drawBracketLine(gc, lc, matchY, srcRX, midX, dstLX, tgtY, CARD_MID);
-                    if (rc != null && matchY.containsKey(rc) && currMs.contains(rc))
-                        drawBracketLine(gc, rc, matchY, srcRX, midX, dstLX, tgtY, CARD_MID);
-                }
-            }
-        }
-
-        // ── Play-in GF feed lines (only when play-in GF exists) ──────
-        if (hasPiGF && matchY.containsKey(piGF)) {
-            gc.setStroke(Color.web("#f39c12")); gc.setLineWidth(2.5);
-            double gfCY = matchY.get(piGF) + CARD_MID, mergeX = piGfX - COL_GAP / 2.0;
-            if (hasPiWb && piWbByRound.containsKey(piWbRounds)) {
-                List<Match> wbFinals = piWbByRound.get(piWbRounds);
-                if (!wbFinals.isEmpty() && matchY.containsKey(wbFinals.get(0))) {
-                    double wy = matchY.get(wbFinals.get(0)) + CARD_MID, wx = colX[piWbRounds - 1] + CARD_W;
-                    gc.strokeLine(wx, wy, mergeX, wy); gc.strokeLine(mergeX, wy, mergeX, gfCY); gc.strokeLine(mergeX, gfCY, piGfX, gfCY);
-                }
-            }
-            if (hasPiLb && !piLbRounds.isEmpty()) {
-                List<Match> lbFinals = piLbByRound.get(piLbRounds.get(piLbRounds.size() - 1));
-                if (lbFinals != null && !lbFinals.isEmpty() && matchY.containsKey(lbFinals.get(0))) {
-                    double ly = matchY.get(lbFinals.get(0)) + CARD_MID;
-                    double lx = colX[piLbRoundToCol.get(piLbRounds.get(piLbRounds.size() - 1))] + CARD_W;
-                    gc.strokeLine(lx, ly, mergeX, ly); gc.strokeLine(mergeX, ly, mergeX, gfCY); gc.strokeLine(mergeX, gfCY, piGfX, gfCY);
-                }
-            }
-        }
-
-        pane.getChildren().add(canvas);
-
-        // ── Section labels (only shown when the section has content) ─
-        if (hasPiWb)
-            addPaneLabel(pane, "WINNERS BRACKET", colX[0], TOP_PAD - 70, "#FFBA09", FontWeight.BOLD, 13);
-        if (hasPiLb)
-            addPaneLabel(pane, "LOSERS BRACKET",  colX[0], lbOffsetY + 10, "#FFBA09", FontWeight.BOLD, 13);
-        if (hasPiGF)
-            addPaneLabel(pane, "Grand Finals", piGfX, piGfY - 22, "#FFD862", FontWeight.BOLD, 12);
-       
-        // Play-in WB round labels
-        if (hasPiWb) {
-            for (Map.Entry<Integer, List<Match>> e : piWbByRound.entrySet()) {
-                int r = e.getKey();
-                double topY = e.getValue().stream().filter(matchY::containsKey).mapToDouble(matchY::get).min().orElse(Double.MAX_VALUE);
-                if (topY == Double.MAX_VALUE) continue;
-                int fromEnd = piWbRounds - r;
-                String rName = fromEnd == 0 ? "Upper Final" : fromEnd == 1 ? "Upper Semifinals" : "Upper Round " + r;
-                Label rl = styledLabel(rName, "#FFD862", FontWeight.BOLD, 11);
-                rl.setLayoutX(colX[r - 1]); rl.setLayoutY(topY - 18);
-                pane.getChildren().add(rl);
-            }
-        }
-        // Play-in LB round labels
-        if (hasPiLb) {
-            for (int r : piLbRounds) {
-                int col = piLbRoundToCol.get(r);
-                double topY = piLbByRound.get(r).stream().filter(matchY::containsKey).mapToDouble(matchY::get).min().orElse(Double.MAX_VALUE);
-                if (topY == Double.MAX_VALUE) continue;
-                Label rl = styledLabel("Losers Round " + (col + 1), "#FFD862", FontWeight.BOLD, 11);
-                rl.setLayoutX(colX[col]); rl.setLayoutY(topY - 18);
-                pane.getChildren().add(rl);
-            }
-        }   
-        if (hasPiWb) {
-            for (Map.Entry<Integer, List<Match>> e : piWbByRound.entrySet()) {
-                int r = e.getKey();
-                for (Match m : e.getValue()) {
-                    if (!matchY.containsKey(m)) continue;
-                    VBox card = createDeMatchCard(m, true, false);
-                    card.setLayoutX(colX[r - 1]); card.setLayoutY(matchY.get(m));
-                    card.setPrefWidth(CARD_W); card.setMaxWidth(CARD_W);
-                    pane.getChildren().add(card);
-                }
-            }
-        }
-        if (hasPiLb) {
-            for (int r : piLbRounds) {
-                int col = piLbRoundToCol.get(r);
-                for (Match m : piLbByRound.get(r)) {
-                    if (!matchY.containsKey(m)) continue;
-                    VBox card = createDeMatchCard(m, false, false);
-                    card.setLayoutX(colX[col]); card.setLayoutY(matchY.get(m));
-                    card.setPrefWidth(CARD_W); card.setMaxWidth(CARD_W);
-                    pane.getChildren().add(card);
-                }
-            }
-        }
-        // Play-in GF card
-        if (hasPiGF && matchY.containsKey(piGF)) {
-            VBox card = createDeMatchCard(piGF, false, true);
-            card.setLayoutX(piGfX); card.setLayoutY(matchY.get(piGF));
-            card.setPrefWidth(CARD_W); card.setMaxWidth(CARD_W);
-            pane.getChildren().add(card);
-        }
-        addScrollPane(pane, 600);
-        Team champion = tournament.getTournamentWinner();
-        if (champion != null) addChampionDisplay(champion);
-    }
-
- 
-   
     private VBox createDeMatchCard(Match match, boolean isWinners, boolean isGrandFinal) {
         String border = "#FFBA09";
         String t1Name = match.getTeam1() != null ? match.getTeam1().getName() : "TBA";

@@ -3,9 +3,7 @@ public enum TournamentType {
     DOUBLE_ELIMINATION("Double Elimination"),
     ROUND_ROBIN("Round Robin"),
     SWISS("Swiss System"),
-    FREE_FOR_ALL("Free For All"),
-    PLAY_IN_DOUBLE_ELIMINATION("Play-In Double Elimination"),
-    PLAY_IN_SINGLE_ELIMINATION("Play-In Single Elimination");
+    FREE_FOR_ALL("Free For All");
 
     private String displayName;
 

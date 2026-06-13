@@ -1,5 +1,5 @@
 BRACKET NAME: 8 players
-BRACKET TYPE: Double Elimination
+BRACKET TYPE: Single Elimination
 SPORT/GAME: Senate
 DESCRIPTION: 
 STATUS: PENDING
