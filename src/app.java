@@ -59,14 +59,6 @@ public class app extends Application {
     }
 }
 
-    /**
-     * Handles automatic persistence of the entire application session
-     * (teams, completed match results, bracket settings, and editable text
-     * fields) so the app can pick up right where the user left off the
-     * next time it's launched. Separate from the manual SAVE BRACKET /
-     * LOAD BRACKET text-file feature, which is a named snapshot the user
-     * chooses to keep.
-     */
     private static class StateDataManager {
 
         private static final File STATE_DIR  = new File("app_data");
@@ -162,14 +154,11 @@ public class app extends Application {
         Map<Integer, MatchSnapshot> snapMap = new HashMap<>();
         for (MatchSnapshot s : frame) snapMap.put(s.matchId, s);
 
-        // Clear all matches first so score matrix and team stats are in a clean state
         for (Match m : tournament.getAllMatches()) {
             m.clearResult();
         }
-        // Clear score matrix completely before replaying
         tournament.clearScoreMatrix();
 
-        // Now restore each match to its snapshot state
         List<Match> sortedMatches = new ArrayList<>(tournament.getAllMatches());
         sortedMatches.sort(java.util.Comparator.comparingInt(Match::getRound));
         for (Match m : sortedMatches) {
@@ -178,7 +167,6 @@ public class app extends Application {
             tournament.revertMatch(m, s.winnerId, s.score);
         }
 
-        // Recalculate team stats once after all matches are restored
         tournament.recalculateAllTeamStats();
 
         updateBracketView();
@@ -190,7 +178,6 @@ public class app extends Application {
     // STATE PERSISTENCE (AUTO-SAVE / AUTO-RESTORE)
     // =========================================================================
 
-    /** Builds a serializable snapshot of everything needed to resume the current session. */
     private StateDataManager.AppState captureCurrentState() {
         StateDataManager.AppState state = new StateDataManager.AppState();
         state.bracketName = bracketNameField.getText();
@@ -215,12 +202,10 @@ public class app extends Application {
         return state;
     }
 
-    /** Persists the current session to disk so it can be auto-restored next launch. */
     private void autoSaveState() {
         stateDataManager.saveState(captureCurrentState());
     }
 
-    /** Restores teams, bracket settings, and completed match results from the last autosave, if any. */
     private void restoreSession() {
         if (!stateDataManager.hasSavedState()) return;
         StateDataManager.AppState state = stateDataManager.loadState();
@@ -248,7 +233,6 @@ public class app extends Application {
             for (Match m : tournament.getAllMatches()) m.clearResult();
             tournament.clearScoreMatrix();
 
-            // Sort by round so early-round winners propagate into later rounds first
             List<Match> sortedMatches = new ArrayList<>(tournament.getAllMatches());
             sortedMatches.sort(java.util.Comparator.comparingInt(Match::getRound));
             for (Match m : sortedMatches) {
@@ -360,9 +344,8 @@ public class app extends Application {
 
 
         participantsList = new VBox(3);
-        participantsList.setPadding(new Insets(4, 4, 4, 4));  // was (6,6,0,6) — add bottom padding back
-        participantsList.setStyle("-fx-background-color: #152055;");  // ADD this line
-
+        participantsList.setPadding(new Insets(4, 4, 4, 4));
+        participantsList.setStyle("-fx-background-color: #152055;"); 
         ScrollPane listScroll = new ScrollPane(participantsList);
         listScroll.setFitToWidth(true);
         listScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
@@ -1173,7 +1156,7 @@ public class app extends Application {
         "-fx-faint-focus-color: transparent;"
     );
 
-    String currentType = bracketTypeCombo.getValue();  // ← must be declared BEFORE use
+    String currentType = bracketTypeCombo.getValue(); 
 
     if (tournament == null || !isValidTeamCount(teams.length, currentType)) {
         String fullMsg = getNotReadyMessage(teams.length, currentType);
@@ -1208,11 +1191,11 @@ public class app extends Application {
             break;
         case "Play-ins SE":
             if (teams.length == 12) displaySingleElimination12();
-            else displaySingleElimination(); // 24-team falls through to generic SE with play-in logic
+            else displaySingleElimination(); 
             break;
         case "Play-ins DE":
             if (teams.length == 12) displayDoubleElimination12();
-            else displayDoubleElimination(); // 24-team
+            else displayDoubleElimination();
             break;
         case "Round Robin":  displayRoundRobin();  break;
         case "Swiss System": displaySwissSystem();  break;
