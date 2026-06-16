@@ -5,13 +5,13 @@ DESCRIPTION:
 STATUS: PENDING
 TEAMS: 8
 ----------------------------------------
-Team: Kiko | Wins: 0 | Losses: 0
-Team: Robin | Wins: 0 | Losses: 0
-Team: Bato | Wins: 0 | Losses: 0
 Team: Trillanes | Wins: 0 | Losses: 0
-Team: Daniel | Wins: 0 | Losses: 0
-Team: Dave | Wins: 0 | Losses: 0
-Team: Juan | Wins: 0 | Losses: 0
 Team: Mark | Wins: 0 | Losses: 0
+Team: Daniel | Wins: 0 | Losses: 0
+Team: Kiko | Wins: 0 | Losses: 0
+Team: Dave | Wins: 0 | Losses: 0
+Team: Bato | Wins: 0 | Losses: 0
+Team: Robin | Wins: 0 | Losses: 0
+Team: Juan | Wins: 0 | Losses: 0
 ----------------------------------------
 MATCH RESULTS:

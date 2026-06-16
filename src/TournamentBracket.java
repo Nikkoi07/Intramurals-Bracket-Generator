@@ -9,7 +9,7 @@ public class TournamentBracket {
     private List<Match> losersBracketMatches;
     private Match grandFinals;
     private Map<Match, Match> winnerToLoserMatch;
-    private Map<Match, Match> lbWinnerAdvanceMap;  // maps each LB match → the next LB match its winner feeds into
+    private Map<Match, Match> lbWinnerAdvanceMap; 
     private ScoreMatrix scoreMatrix;
 
     public TournamentBracket(Team[] teams) {
@@ -17,7 +17,7 @@ public class TournamentBracket {
     }
 
     public TournamentBracket(Team[] teams, TournamentType type) {
-        Match.resetIdCounter();   // always start match IDs fresh for each new bracket
+        Match.resetIdCounter();   
         this.teams                = teams;
         this.tournamentType       = type;
         this.allMatches           = new ArrayList<>();
@@ -26,8 +26,8 @@ public class TournamentBracket {
         this.losersBracketMatches = new ArrayList<>();
         this.scoreMatrix          = new ScoreMatrix(teams);
 
-        if      (type == TournamentType.SINGLE_ELIMINATION) {
-            if      (teams.length == 12) buildSingleElimination12(teams);
+            if  (type == TournamentType.SINGLE_ELIMINATION) {
+            if (teams.length == 12) buildPlayInSE12(teams);
             else if (teams.length == 24) buildSingleElimination24(teams);
             else                         buildSingleElimination(teams);
         }
@@ -71,8 +71,6 @@ public class TournamentBracket {
         int numRounds = (int) Math.ceil(Math.log(n) / Math.log(2));
         int fullSize  = (int) Math.pow(2, numRounds);
 
-        // For standard power-of-2 counts (4, 8, 16, 32): fill all slots, no byes
-        // For bye counts (10 → pad to 16, 20 → pad to 32): top seeds get byes
         Team[] slots = seededSlots(teams, fullSize);
 
         List<Match> currentRound = new ArrayList<>();
@@ -86,7 +84,7 @@ public class TournamentBracket {
             m.setMatchId(matchId++);
             if (t1 != null) m.setTeam1(t1);
             if (t2 != null) m.setTeam2(t2);
-            if (!isPowerOfTwo(n)) autoCompleteBye(m); // only auto-advance byes for non-power-of-2
+            if (!isPowerOfTwo(n)) autoCompleteBye(m); 
             if (m.getTeam1() != null || m.getTeam2() != null) {
                 currentRound.add(m);
                 allMatches.add(m);
@@ -118,16 +116,6 @@ public class TournamentBracket {
 
     private boolean isPowerOfTwo(int n) { return n > 0 && (n & (n - 1)) == 0; }
 
-    // =========================================================================
-    // SINGLE ELIMINATION – 24 teams
-    //
-    // 32-slot grid: top 8 seeds (Seeds #1-8) get byes → auto-advance R1.
-    // Round 1  (Opening Round):  8 matches — Seeds #9-#24 (16 teams)
-    // Round 2  (Round of 16):    8 matches — 8 R1-winners vs 8 bye seeds
-    // Round 3  (Quarterfinals):  4 matches
-    // Round 4  (Semifinals):     2 matches
-    // Round 5  (Championship):   1 match
-    // =========================================================================
 
     private void buildSingleElimination24(Team[] teams) {
         allMatches.clear();
@@ -218,16 +206,13 @@ public class TournamentBracket {
     // Round 4 (Championship):  1 match
     // =========================================================================
 
-    private void buildSingleElimination12(Team[] teams) {
-        allMatches.clear();
+    private void buildPlayInSE12(Team[] teams) {     
+       allMatches.clear();
         losersBracketMatches = new ArrayList<>();
         winnerToLoserMatch.clear();
 
         int matchId = 1;
-
-        // Use the 16-slot seeding trick: seeds 1-4 are paired against null (seeds 13-16)
-        // → they auto-bye. Seeds 5-12 are paired against each other → real R1 matches.
-        Team[] slots16 = seededSlots(teams, 16); // null where seed > 12
+        Team[] slots16 = seededSlots(teams, 16); 
 
         List<Match> r1Matches = new ArrayList<>();
         for (int i = 0; i < 16; i += 2) {
@@ -238,7 +223,7 @@ public class TournamentBracket {
             m.setMatchId(matchId++);
             if (t1 != null) m.setTeam1(t1);
             if (t2 != null) m.setTeam2(t2);
-            autoCompleteBye(m); // auto-advance seeds 1-4 who face null
+            autoCompleteBye(m);
             r1Matches.add(m);
             allMatches.add(m);
         }
@@ -1522,6 +1507,12 @@ public class TournamentBracket {
                         int s2 = Integer.parseInt(parts[1].trim());
                         scoreMatrix.recordMatch(id1, id2, s1, s2);
                     } catch (Exception ignored) {}
+                }
+                // Propagate winner into the next round's team slot,
+                // exactly as recordWinner does — this fills later-round TBA slots.
+                if (tournamentType == TournamentType.SINGLE_ELIMINATION
+                        || tournamentType == TournamentType.DOUBLE_ELIMINATION) {
+                    propagateWinnerUp(match, winner);
                 }
             }
         }

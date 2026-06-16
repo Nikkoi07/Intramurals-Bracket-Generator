@@ -1,9 +1,0 @@
-BRACKET NAME: 
-BRACKET TYPE: Single Elimination
-SPORT/GAME: 
-DESCRIPTION: 
-STATUS: PENDING
-TEAMS: 0
-----------------------------------------
-----------------------------------------
-MATCH RESULTS:

@@ -11,8 +11,14 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.paint.Color;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Arrays;
@@ -39,6 +45,7 @@ public class app extends Application {
     private double savedScrollH = 0;
     private double savedScrollV = 0;
     private int dragSourceIndex = -1;
+    private final StateDataManager stateDataManager = new StateDataManager();
 
      private static class MatchSnapshot {
         final int    matchId;
@@ -52,6 +59,88 @@ public class app extends Application {
     }
 }
 
+    /**
+     * Handles automatic persistence of the entire application session
+     * (teams, completed match results, bracket settings, and editable text
+     * fields) so the app can pick up right where the user left off the
+     * next time it's launched. Separate from the manual SAVE BRACKET /
+     * LOAD BRACKET text-file feature, which is a named snapshot the user
+     * chooses to keep.
+     */
+    private static class StateDataManager {
+
+        private static final File STATE_DIR  = new File("app_data");
+        private static final File STATE_FILE = new File(STATE_DIR, "autosave.dat");
+
+        static class AppState implements Serializable {
+            private static final long serialVersionUID = 1L;
+
+            String bracketName;
+            String bracketType;
+            String sport;
+            String description;
+
+            double scrollH;
+            double scrollV;
+
+            List<TeamData>  teamList  = new ArrayList<>();
+            List<MatchData> matchList = new ArrayList<>();
+        }
+
+        static class TeamData implements Serializable {
+            private static final long serialVersionUID = 1L;
+            final int id;
+            final String name;
+
+            TeamData(int id, String name) {
+                this.id = id;
+                this.name = name;
+            }
+        }
+
+        static class MatchData implements Serializable {
+            private static final long serialVersionUID = 1L;
+            final int matchId;
+            final String winnerName;
+            final String score;
+
+            MatchData(int matchId, String winnerName, String score) {
+                this.matchId = matchId;
+                this.winnerName = winnerName;
+                this.score = score;
+            }
+        }
+
+        boolean hasSavedState() {
+            return STATE_FILE.exists() && STATE_FILE.length() > 0;
+        }
+
+        boolean saveState(AppState state) {
+            try {
+                if (!STATE_DIR.exists()) STATE_DIR.mkdirs();
+                try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(STATE_FILE))) {
+                    out.writeObject(state);
+                }
+                return true;
+            } catch (IOException e) {
+                System.err.println("StateDataManager: failed to save state - " + e.getMessage());
+                return false;
+            }
+        }
+
+        AppState loadState() {
+            if (!hasSavedState()) return null;
+            try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(STATE_FILE))) {
+                Object obj = in.readObject();
+                return (obj instanceof AppState) ? (AppState) obj : null;
+            } catch (IOException | ClassNotFoundException e) {
+                System.err.println("StateDataManager: failed to load state - " + e.getMessage());
+                return null;
+            }
+        }
+
+    }
+    
     private final Deque<List<MatchSnapshot>> undoStack = new ArrayDeque<>();
 
     private void pushUndoState() {
@@ -81,7 +170,9 @@ public class app extends Application {
         tournament.clearScoreMatrix();
 
         // Now restore each match to its snapshot state
-        for (Match m : tournament.getAllMatches()) {
+        List<Match> sortedMatches = new ArrayList<>(tournament.getAllMatches());
+        sortedMatches.sort(java.util.Comparator.comparingInt(Match::getRound));
+        for (Match m : sortedMatches) {
             MatchSnapshot s = snapMap.get(m.getMatchId());
             if (s == null) continue;
             tournament.revertMatch(m, s.winnerId, s.score);
@@ -92,6 +183,88 @@ public class app extends Application {
 
         updateBracketView();
         updateProgress();
+        autoSaveState();
+    }
+
+    // =========================================================================
+    // STATE PERSISTENCE (AUTO-SAVE / AUTO-RESTORE)
+    // =========================================================================
+
+    /** Builds a serializable snapshot of everything needed to resume the current session. */
+    private StateDataManager.AppState captureCurrentState() {
+        StateDataManager.AppState state = new StateDataManager.AppState();
+        state.bracketName = bracketNameField.getText();
+        state.bracketType = bracketTypeCombo.getValue();
+        state.sport       = sportField.getText();
+        state.description = descriptionArea.getText();
+        state.scrollH = savedScrollH;
+        state.scrollV = savedScrollV;
+
+        for (Team t : teams) {
+            state.teamList.add(new StateDataManager.TeamData(t.getId(), t.getName()));
+        }
+
+        if (tournament != null) {
+            for (Match m : tournament.getAllMatches()) {
+                if (m.isCompleted()) {
+                    String winnerName = (m.getWinner() != null) ? m.getWinner().getName() : null;
+                    state.matchList.add(new StateDataManager.MatchData(m.getMatchId(), winnerName, m.getScore()));
+                }
+            }
+        }
+        return state;
+    }
+
+    /** Persists the current session to disk so it can be auto-restored next launch. */
+    private void autoSaveState() {
+        stateDataManager.saveState(captureCurrentState());
+    }
+
+    /** Restores teams, bracket settings, and completed match results from the last autosave, if any. */
+    private void restoreSession() {
+        if (!stateDataManager.hasSavedState()) return;
+        StateDataManager.AppState state = stateDataManager.loadState();
+        if (state == null) return;
+
+        bracketNameField.setText(state.bracketName != null ? state.bracketName : "");
+        sportField.setText(state.sport != null ? state.sport : "");
+        descriptionArea.setText(state.description != null ? state.description : "");
+        if (state.bracketType != null && bracketTypeCombo.getItems().contains(state.bracketType)) {
+            bracketTypeCombo.setValue(state.bracketType);
+        }
+
+        teams = new Team[state.teamList.size()];
+        for (int i = 0; i < teams.length; i++) {
+            StateDataManager.TeamData td = state.teamList.get(i);
+            teams[i] = new Team(td.id, td.name);
+        }
+
+        rebuildTournament();
+
+        if (tournament != null && !state.matchList.isEmpty()) {
+            Map<Integer, StateDataManager.MatchData> byId = new HashMap<>();
+            for (StateDataManager.MatchData md : state.matchList) byId.put(md.matchId, md);
+
+            for (Match m : tournament.getAllMatches()) m.clearResult();
+            tournament.clearScoreMatrix();
+
+            // Sort by round so early-round winners propagate into later rounds first
+            List<Match> sortedMatches = new ArrayList<>(tournament.getAllMatches());
+            sortedMatches.sort(java.util.Comparator.comparingInt(Match::getRound));
+            for (Match m : sortedMatches) {
+                StateDataManager.MatchData md = byId.get(m.getMatchId());
+                if (md == null) continue;
+                tournament.revertMatch(m, md.winnerName, md.score);
+            }
+            tournament.recalculateAllTeamStats();
+        }
+
+        savedScrollH = state.scrollH;
+        savedScrollV = state.scrollV;
+
+        if (teams.length > 0) {
+            showAlert("Session Restored", "Your previous tournament was restored automatically.");
+        }
     }
 
     @Override
@@ -127,8 +300,11 @@ public class app extends Application {
         Scene scene = new Scene(mainLayout, 1200, 800);
         scene.setFill(Color.web("#040D43"));
         primaryStage.setScene(scene);
+        primaryStage.setOnCloseRequest(e -> autoSaveState());
         primaryStage.show();
 
+        restoreSession();
+        updateParticipantsList();
         updateBracketView();
         updateProgress();
     }
@@ -319,6 +495,7 @@ public class app extends Application {
                     updateParticipantsList();
                     updateBracketView();
                     updateProgress();
+                    autoSaveState();
                 }
             }
             e.consume();
@@ -510,6 +687,7 @@ public class app extends Application {
                 updateParticipantsList();
                 updateBracketView();
                 updateProgress();
+                autoSaveState();
             } else {
                 updateParticipantsList();
             }
@@ -551,6 +729,7 @@ public class app extends Application {
         }
         updateBracketView();
         updateProgress();
+        autoSaveState();
     }
 
     private VBox createBracketViewPanel() {
@@ -667,6 +846,7 @@ public class app extends Application {
         updateParticipantsList();
         updateBracketView();
         updateProgress();
+        autoSaveState();
 
         String msg = teamsToRemove.size() + " team(s) removed. Remaining: " + teams.length;
         if (!isValidTeamCount(teams.length, bracketTypeCombo.getValue()) && teams.length > 0)
@@ -689,6 +869,7 @@ public class app extends Application {
         updateParticipantsList();
         updateBracketView();
         updateProgress();
+        autoSaveState();
     }
 
     // =========================================================================
@@ -761,6 +942,7 @@ public class app extends Application {
             rebuildTournament();
             updateBracketView();
             updateProgress();
+            autoSaveState();
         });
 
         Label sportLabel = new Label("Sport/Game:");
@@ -859,7 +1041,7 @@ public class app extends Application {
 
         loadBtn.setOnAction(e       -> loadBracket());
         saveBracketBtn.setOnAction(e -> saveBracket());
-        exitBtn.setOnAction(e       -> System.exit(0));
+        exitBtn.setOnAction(e       -> { autoSaveState(); System.exit(0); });
 
         Button scoreMatrixBtn = new Button("SCORE MATRIX");
         scoreMatrixBtn.setPrefWidth(Double.MAX_VALUE);
@@ -924,7 +1106,7 @@ public class app extends Application {
     // =========================================================================
 
     private String getNotReadyMessage(int n, String type) {
-    if (n == 0) return "Single Elimination (4, 8, 16, 32) \nDouble Elimination (4, 8, 16, 32) \nPlay-ins SE (12, 24) \nPlay-ins DE (12, 24) \nRound Robin (3–8 teams) \nSwiss System (4–20 teams) \nFree For All (4–12 teams).";
+    if (n == 0) return "Single Elimination (4, 8, 16, 32) \nDouble Elimination (4, 8, 16, 32) \nPlay-ins SE (12, 24) \nPlay-ins DE (12, 24) \nRound Robin (3 - 8 teams) \nSwiss System (4 - 20 teams) \nFree For All (4 - 12 teams)";
     
     if ("Single Elimination".equals(type)) {
         if (n < 4) return "Need at least 4 Participants for Single Elimination.";
@@ -1882,11 +2064,25 @@ public class app extends Application {
     if (done && !score.isEmpty()) {
         String[] p = score.split("-");
         if (teamIndex < p.length) sc.setText(p[teamIndex].trim());
-        boolean isWinner = winner != null && winner.getName().equals(teamName);
+        // Determine winner/loser purely from score to avoid name-comparison ambiguity
+        boolean isWinner = false;
+        boolean isLoser  = false;
+        if (p.length >= 2) {
+            try {
+                int s0 = Integer.parseInt(p[0].trim());
+                int s1 = Integer.parseInt(p[1].trim());
+                if (teamIndex == 0) { isWinner = s0 > s1; isLoser = s0 < s1; }
+                else                { isWinner = s1 > s0; isLoser = s1 < s0; }
+            } catch (NumberFormatException ignored) {
+                // Fall back to name comparison if scores aren't numeric
+                isWinner = winner != null && winner.getName().equals(teamName);
+                isLoser  = winner != null && !winner.getName().equals(teamName);
+            }
+        }
         if (isWinner) {
             lbl.setStyle("-fx-text-fill: #FFC107 ; -fx-font-weight: bold;");
             sc.setStyle("-fx-text-fill: #FFC107 ;");
-        } else {
+        } else if (isLoser) {
             lbl.setStyle("-fx-text-fill: #FCEB92 ; -fx-font-weight: normal;");
             sc.setStyle("-fx-text-fill: #FCEB92 ;");
             row.setStyle("-fx-background-color: #eeeeee80; -fx-background-radius: 3;");
@@ -2384,6 +2580,7 @@ public class app extends Application {
                 pushUndoState();
                 tournament.recordWinner(match, w, score1, score2);
                 updateBracketView(); updateProgress();
+                autoSaveState();
                 dlg.close();
             } catch (NumberFormatException ex) { showAlert("Error", "Please enter valid numbers for scores!"); }
         });
@@ -2416,7 +2613,7 @@ public class app extends Application {
                 if (m.isCompleted()) {
                     String t1 = m.getTeam1() != null ? m.getTeam1().getName() : "TBA";
                     String t2 = m.getTeam2() != null ? m.getTeam2().getName() : "TBA";
-                    writer.println(t1 + " vs " + t2 + " -> Winner: " + m.getWinner().getName() + " (" + m.getScore() + ")");
+                    writer.println("Match " + m.getMatchId() + ": " + t1 + " vs " + t2 + " -> Winner: " + m.getWinner().getName() + " (" + m.getScore() + ")");
                 }
             }
             showAlert("Saved", "Bracket '" + name + "' saved to:\n" + saveFile.getAbsolutePath());
@@ -2438,6 +2635,7 @@ public class app extends Application {
                 String bracketName = "", bracketType = "Single Elimination", sport = "";
                 StringBuilder desc = new StringBuilder();
                 List<String> teamNames = new ArrayList<>();
+                Map<Integer, String[]> matchResults = new HashMap<>(); // matchId -> {winnerName, score}
                 while (sc.hasNextLine()) {
                     String line = sc.nextLine();
                     if      (line.startsWith("BRACKET NAME: ")) bracketName = line.substring(14);
@@ -2449,6 +2647,19 @@ public class app extends Application {
                         int idx = tName.indexOf(" |");
                         if (idx > 0) tName = tName.substring(0, idx);
                         teamNames.add(tName);
+                    } else if (line.startsWith("Match ")) {
+                        try {
+                            int colonIdx = line.indexOf(':');
+                            int winnerIdx = line.indexOf("Winner: ");
+                            int scoreOpenIdx = line.lastIndexOf('(');
+                            int scoreCloseIdx = line.lastIndexOf(')');
+                            if (colonIdx > 6 && winnerIdx >= 0 && scoreOpenIdx > winnerIdx && scoreCloseIdx > scoreOpenIdx) {
+                                int matchId = Integer.parseInt(line.substring(6, colonIdx).trim());
+                                String winnerName = line.substring(winnerIdx + 8, scoreOpenIdx).trim();
+                                String score = line.substring(scoreOpenIdx + 1, scoreCloseIdx).trim();
+                                matchResults.put(matchId, new String[]{winnerName, score});
+                            }
+                        } catch (NumberFormatException ignored) { /* skip malformed line */ }
                     }
                 }
                 teams = new Team[teamNames.size()];
@@ -2458,9 +2669,25 @@ public class app extends Application {
                 sportField.setText(sport);
                 descriptionArea.setText(desc.toString());
                 rebuildTournament();
+
+                if (tournament != null && !matchResults.isEmpty()) {
+                    for (Match m : tournament.getAllMatches()) m.clearResult();
+                    tournament.clearScoreMatrix();
+                    // Sort by round so early-round winners propagate into later rounds first
+                    List<Match> sortedMatches = new ArrayList<>(tournament.getAllMatches());
+                    sortedMatches.sort(java.util.Comparator.comparingInt(Match::getRound));
+                    for (Match m : sortedMatches) {
+                        String[] result = matchResults.get(m.getMatchId());
+                        if (result == null) continue;
+                        tournament.revertMatch(m, result[0], result[1]);
+                    }
+                    tournament.recalculateAllTeamStats();
+                }
+
                 updateBracketView();
                 updateParticipantsList();
                 updateProgress();
+                autoSaveState();
                 showAlert("Loaded", "Successfully loaded: " + selected.getName());
             } catch (FileNotFoundException e) { showAlert("Load Error", "Could not load file: " + e.getMessage()); }
         }
