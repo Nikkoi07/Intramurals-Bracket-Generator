@@ -11,25 +11,23 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.paint.Color;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.PrintWriter;
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * app.java — Frontend / UI layer only.
+ *
+ * All state persistence and undo history are delegated to
+ * {@link StateDataManager}.
+ */
 public class app extends Application {
+
+    // ── UI fields ──────────────────────────────────────────────────────────
     private TournamentBracket tournament;
     private Team[] teams;
     private VBox participantsList;
@@ -45,130 +43,24 @@ public class app extends Application {
     private double savedScrollH = 0;
     private double savedScrollV = 0;
     private int dragSourceIndex = -1;
+
+    // ── Backend services ───────────────────────────────────────────────────
     private final StateDataManager stateDataManager = new StateDataManager();
 
-     private static class MatchSnapshot {
-        final int    matchId;
-        final String winnerId;
-        final String score;
+    // ── Undo bridge methods (called from UI event handlers) ────────────────
 
-    MatchSnapshot(int matchId, String winnerId, String score) {
-        this.matchId  = matchId;
-        this.winnerId = winnerId;
-        this.score    = score;
-    }
-}
-
-    private static class StateDataManager {
-
-        private static final File STATE_DIR  = new File("app_data");
-        private static final File STATE_FILE = new File(STATE_DIR, "autosave.dat");
-
-        static class AppState implements Serializable {
-            private static final long serialVersionUID = 1L;
-
-            String bracketName;
-            String bracketType;
-            String sport;
-            String description;
-
-            double scrollH;
-            double scrollV;
-
-            List<TeamData>  teamList  = new ArrayList<>();
-            List<MatchData> matchList = new ArrayList<>();
-        }
-
-        static class TeamData implements Serializable {
-            private static final long serialVersionUID = 1L;
-            final int id;
-            final String name;
-
-            TeamData(int id, String name) {
-                this.id = id;
-                this.name = name;
-            }
-        }
-
-        static class MatchData implements Serializable {
-            private static final long serialVersionUID = 1L;
-            final int matchId;
-            final String winnerName;
-            final String score;
-
-            MatchData(int matchId, String winnerName, String score) {
-                this.matchId = matchId;
-                this.winnerName = winnerName;
-                this.score = score;
-            }
-        }
-
-        boolean hasSavedState() {
-            return STATE_FILE.exists() && STATE_FILE.length() > 0;
-        }
-
-        boolean saveState(AppState state) {
-            try {
-                if (!STATE_DIR.exists()) STATE_DIR.mkdirs();
-                try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(STATE_FILE))) {
-                    out.writeObject(state);
-                }
-                return true;
-            } catch (IOException e) {
-                System.err.println("StateDataManager: failed to save state - " + e.getMessage());
-                return false;
-            }
-        }
-
-        AppState loadState() {
-            if (!hasSavedState()) return null;
-            try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(STATE_FILE))) {
-                Object obj = in.readObject();
-                return (obj instanceof AppState) ? (AppState) obj : null;
-            } catch (IOException | ClassNotFoundException e) {
-                System.err.println("StateDataManager: failed to load state - " + e.getMessage());
-                return null;
-            }
-        }
-
-    }
-    
-    private final Deque<List<MatchSnapshot>> undoStack = new ArrayDeque<>();
-
+    /** Captures current tournament state before a change is made. */
     private void pushUndoState() {
-        if (tournament == null) return;
-        List<MatchSnapshot> frame = new ArrayList<>();
-        for (Match m : tournament.getAllMatches()) {
-            String winnerName = (m.getWinner() != null) ? m.getWinner().getName() : null;
-            frame.add(new MatchSnapshot(m.getMatchId(), winnerName, m.getScore()));
-        }
-        undoStack.push(frame);
+        stateDataManager.pushUndo(tournament);
     }
 
+    /** Reverts the last change and refreshes all UI panels. */
     private void performUndo() {
-        if (undoStack.isEmpty()) {
+        if (stateDataManager.isUndoEmpty()) {
             showAlert("Undo", "Nothing to undo.");
             return;
         }
-        List<MatchSnapshot> frame = undoStack.pop();
-        Map<Integer, MatchSnapshot> snapMap = new HashMap<>();
-        for (MatchSnapshot s : frame) snapMap.put(s.matchId, s);
-
-        for (Match m : tournament.getAllMatches()) {
-            m.clearResult();
-        }
-        tournament.clearScoreMatrix();
-
-        List<Match> sortedMatches = new ArrayList<>(tournament.getAllMatches());
-        sortedMatches.sort(java.util.Comparator.comparingInt(Match::getRound));
-        for (Match m : sortedMatches) {
-            MatchSnapshot s = snapMap.get(m.getMatchId());
-            if (s == null) continue;
-            tournament.revertMatch(m, s.winnerId, s.score);
-        }
-
-        tournament.recalculateAllTeamStats();
-
+        stateDataManager.undo(tournament);
         updateBracketView();
         updateProgress();
         autoSaveState();
@@ -782,7 +674,7 @@ public class app extends Application {
     }
 
      private void rebuildTournament() {
-        undoStack.clear();
+        stateDataManager.clearUndoHistory();
         for (int i = 0; i < teams.length; i++)
             teams[i] = new Team(teams[i].getId(), teams[i].getName());
         String btype = bracketTypeCombo.getValue();
@@ -2572,108 +2464,89 @@ public class app extends Application {
     }
 
     // =========================================================================
-    // SAVE / LOAD
+    // SAVE / LOAD (delegated to StateDataManager)
     // =========================================================================
 
     private void saveBracket() {
-        String name = bracketNameField.getText();
-        File saveDir = new File("saved_brackets");
-        if (!saveDir.exists()) saveDir.mkdir();
-        File saveFile = new File(saveDir, name.replaceAll("\\s+", "_") + ".txt");
-        try (PrintWriter writer = new PrintWriter(saveFile)) {
-            writer.println("BRACKET NAME: " + name);
-            writer.println("BRACKET TYPE: " + bracketTypeCombo.getValue());
-            writer.println("SPORT/GAME: " + sportField.getText());
-            writer.println("DESCRIPTION: " + descriptionArea.getText());
-            writer.println("STATUS: " + statusLabel.getText());
-            writer.println("TEAMS: " + teams.length);
-            writer.println("----------------------------------------");
-            for (Team t : teams)
-                writer.println("Team: " + t.getName() + " | Wins: " + t.getWins() + " | Losses: " + t.getLosses());
-            writer.println("----------------------------------------");
-            writer.println("MATCH RESULTS:");
-            if (tournament != null) for (Match m : tournament.getAllMatches()) {
-                if (m.isCompleted()) {
-                    String t1 = m.getTeam1() != null ? m.getTeam1().getName() : "TBA";
-                    String t2 = m.getTeam2() != null ? m.getTeam2().getName() : "TBA";
-                    writer.println("Match " + m.getMatchId() + ": " + t1 + " vs " + t2 + " -> Winner: " + m.getWinner().getName() + " (" + m.getScore() + ")");
-                }
-            }
-            showAlert("Saved", "Bracket '" + name + "' saved to:\n" + saveFile.getAbsolutePath());
-        } catch (FileNotFoundException e) { showAlert("Save Error", "Could not save: " + e.getMessage()); }
+        String name = bracketNameField.getText().trim();
+        if (name.isEmpty()) {
+            showAlert("Error", "Please enter a bracket name before saving.");
+            return;
+        }
+        
+        boolean success = stateDataManager.saveBracket(
+            name,
+            bracketTypeCombo.getValue(),
+            sportField.getText(),
+            descriptionArea.getText(),
+            statusLabel.getText(),
+            teams,
+            tournament
+        );
+        
+        if (success) {
+            showAlert("Saved", "Bracket '" + name + "' saved to:\n" + 
+                      stateDataManager.getSavedBracketsDir().getAbsolutePath() + File.separator + 
+                      name.replaceAll("\\s+", "_") + ".txt");
+        } else {
+            showAlert("Save Error", "Could not save the bracket. Please check file permissions.");
+        }
     }
 
     private void loadBracket() {
-        File saveDir = new File("saved_brackets");
-        if (!saveDir.exists() || saveDir.listFiles() == null || saveDir.listFiles().length == 0) {
-            showAlert("No Brackets", "No saved brackets found."); return;
+        if (!stateDataManager.hasSavedBrackets()) {
+            showAlert("No Brackets", "No saved brackets found.");
+            return;
         }
+        
         javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
         fc.setTitle("Load Bracket");
-        fc.setInitialDirectory(saveDir);
+        fc.setInitialDirectory(stateDataManager.getSavedBracketsDir());
         fc.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("Text Files", "*.txt"));
         File selected = fc.showOpenDialog(null);
-        if (selected != null) {
-            try (java.util.Scanner sc = new java.util.Scanner(selected)) {
-                String bracketName = "", bracketType = "Single Elimination", sport = "";
-                StringBuilder desc = new StringBuilder();
-                List<String> teamNames = new ArrayList<>();
-                Map<Integer, String[]> matchResults = new HashMap<>(); // matchId -> {winnerName, score}
-                while (sc.hasNextLine()) {
-                    String line = sc.nextLine();
-                    if      (line.startsWith("BRACKET NAME: ")) bracketName = line.substring(14);
-                    else if (line.startsWith("BRACKET TYPE: ")) bracketType = line.substring(14);
-                    else if (line.startsWith("SPORT/GAME: "))   sport = line.substring(12);
-                    else if (line.startsWith("DESCRIPTION: "))  desc.append(line.substring(13));
-                    else if (line.startsWith("Team: ")) {
-                        String tName = line.substring(6);
-                        int idx = tName.indexOf(" |");
-                        if (idx > 0) tName = tName.substring(0, idx);
-                        teamNames.add(tName);
-                    } else if (line.startsWith("Match ")) {
-                        try {
-                            int colonIdx = line.indexOf(':');
-                            int winnerIdx = line.indexOf("Winner: ");
-                            int scoreOpenIdx = line.lastIndexOf('(');
-                            int scoreCloseIdx = line.lastIndexOf(')');
-                            if (colonIdx > 6 && winnerIdx >= 0 && scoreOpenIdx > winnerIdx && scoreCloseIdx > scoreOpenIdx) {
-                                int matchId = Integer.parseInt(line.substring(6, colonIdx).trim());
-                                String winnerName = line.substring(winnerIdx + 8, scoreOpenIdx).trim();
-                                String score = line.substring(scoreOpenIdx + 1, scoreCloseIdx).trim();
-                                matchResults.put(matchId, new String[]{winnerName, score});
-                            }
-                        } catch (NumberFormatException ignored) { /* skip malformed line */ }
-                    }
-                }
-                teams = new Team[teamNames.size()];
-                for (int i = 0; i < teamNames.size(); i++) teams[i] = new Team(i, teamNames.get(i));
-                bracketNameField.setText(bracketName);
-                bracketTypeCombo.setValue(bracketType);
-                sportField.setText(sport);
-                descriptionArea.setText(desc.toString());
-                rebuildTournament();
-
-                if (tournament != null && !matchResults.isEmpty()) {
-                    for (Match m : tournament.getAllMatches()) m.clearResult();
-                    tournament.clearScoreMatrix();
-                    // Sort by round so early-round winners propagate into later rounds first
-                    List<Match> sortedMatches = new ArrayList<>(tournament.getAllMatches());
-                    sortedMatches.sort(java.util.Comparator.comparingInt(Match::getRound));
-                    for (Match m : sortedMatches) {
-                        String[] result = matchResults.get(m.getMatchId());
-                        if (result == null) continue;
-                        tournament.revertMatch(m, result[0], result[1]);
-                    }
-                    tournament.recalculateAllTeamStats();
-                }
-
-                updateBracketView();
-                updateParticipantsList();
-                updateProgress();
-                autoSaveState();
-                showAlert("Loaded", "Successfully loaded: " + selected.getName());
-            } catch (FileNotFoundException e) { showAlert("Load Error", "Could not load file: " + e.getMessage()); }
+        
+        if (selected == null) return;
+        
+        StateDataManager.LoadResult result = stateDataManager.loadBracket(selected);
+        if (result == null) {
+            showAlert("Load Error", "Could not load the bracket file.");
+            return;
         }
+
+        // Apply loaded data
+        teams = new Team[result.teamNames.size()];
+        for (int i = 0; i < result.teamNames.size(); i++) {
+            teams[i] = new Team(i, result.teamNames.get(i));
+        }
+        
+        bracketNameField.setText(result.bracketName);
+        if (bracketTypeCombo.getItems().contains(result.bracketType)) {
+            bracketTypeCombo.setValue(result.bracketType);
+        }
+        sportField.setText(result.sport);
+        descriptionArea.setText(result.description);
+        
+        rebuildTournament();
+
+        if (tournament != null && !result.matchResults.isEmpty()) {
+            for (Match m : tournament.getAllMatches()) m.clearResult();
+            tournament.clearScoreMatrix();
+            // Sort by round so earlier-round winners propagate first
+            List<Match> sortedMatches = new ArrayList<>(tournament.getAllMatches());
+            sortedMatches.sort(java.util.Comparator.comparingInt(Match::getRound));
+            for (Match m : sortedMatches) {
+                String[] matchResult = result.matchResults.get(m.getMatchId());
+                if (matchResult == null) continue;
+                tournament.revertMatch(m, matchResult[0], matchResult[1]);
+            }
+            tournament.recalculateAllTeamStats();
+        }
+
+        updateBracketView();
+        updateParticipantsList();
+        updateProgress();
+        autoSaveState();
+        showAlert("Loaded", "Successfully loaded: " + selected.getName());
     }
 
     // =========================================================================

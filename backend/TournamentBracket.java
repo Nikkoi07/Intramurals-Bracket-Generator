@@ -27,14 +27,14 @@ public class TournamentBracket {
         this.scoreMatrix          = new ScoreMatrix(teams);
 
             if  (type == TournamentType.SINGLE_ELIMINATION) {
-            if (teams.length == 12) buildPlayInSE12(teams);
-            else if (teams.length == 24) buildSingleElimination24(teams);
+            if (teams.length == 12) buildPlayInSE(teams, 16);
+            else if (teams.length == 24) buildPlayInSE(teams, 32);
             else                         buildSingleElimination(teams);
         }
         else if (type == TournamentType.ROUND_ROBIN)                buildRoundRobin(teams);
         else if (type == TournamentType.DOUBLE_ELIMINATION) {
-            if      (teams.length == 12) buildDoubleElimination12(teams);
-            else if (teams.length == 24) buildDoubleElimination24(teams);
+            if      (teams.length == 12) buildPlayInDoubleElimination(teams, 16);
+            else if (teams.length == 24) buildPlayInDoubleElimination(teams, 32);
             else                         buildDoubleElimination(teams);
         }
         else if (type == TournamentType.SWISS)                      buildSwissSystem(teams);
@@ -117,107 +117,27 @@ public class TournamentBracket {
     private boolean isPowerOfTwo(int n) { return n > 0 && (n & (n - 1)) == 0; }
 
 
-    private void buildSingleElimination24(Team[] teams) {
+    // =========================================================================
+    // SINGLE ELIMINATION — PLAY-IN (used for 12 and 24 team brackets)
+    //
+    // bracketSize is the next power-of-two slot grid (16 for 12 teams,
+    // 32 for 24 teams). Top seeds (whatever doesn't fit in the contested
+    // slots) get byes via seededSlots()+autoCompleteBye(); everyone else
+    // plays a real Round 1 match. Rounds 2..N are standard halving.
+    // =========================================================================
+
+    private void buildPlayInSE(Team[] teams, int bracketSize) {
         allMatches.clear();
         losersBracketMatches = new ArrayList<>();
         winnerToLoserMatch.clear();
 
-        // Seeds #1-8 are bye teams; seeds #9-24 play Round 1
-        // We model this as a 32-slot bracket where the 8 bye seeds occupy the
-        // "first" slot of each R1 pair and their partner slot is null (auto-bye).
-        // The 16 play-in teams fill the 16 contested slots in Round 1.
-        //
-        // Bracket layout (32 slots, seed-ordered):
-        //  slot 0  = seed 1  (bye)   slot 1  = seed 16 (R1 play)  → R1 match A
-        //  slot 2  = seed 9  (R1)    slot 3  = seed 24 (R1 play)  → R1 match B
-        //  ... etc.
-        //
-        // Simpler approach: build as a standard 32-slot bracket where
-        // positions for seeds 1-8 auto-complete as byes, then rounds 2-5
-        // are built normally via child-links.
-
         int matchId = 1;
-
-        // seededSlots for 32 slots, but only 24 teams provided.
-        // Seeds 1-24 fill slots; "seeds" 25-32 would be null → those slots vanish.
-        // With 24 teams in a 32-slot bracket the seeding places byes at positions
-        // that the buildSeedOrder algorithm naturally puts seeds 25-32 (non-existent),
-        // but we need Seeds 1-8 to be the byes, not 25-32.
-        //
-        // Custom approach: we explicitly control the 32 slots.
-        // The standard power-of-2 seeding for 32 slots is:
-        //   1 vs 32, 16 vs 17, 9 vs 24, 8 vs 25, 5 vs 28, 12 vs 21, 13 vs 20, 4 vs 29 ...
-        // For 24 teams "25-32" don't exist → those slots are null → autobye.
-        // But seeds 1-8 end up paired against seeds 25-32 (non-existent) → they auto-bye! ✓
-        // Seeds 9-24 all pair against each other or against existing seeds → R1 real matches. ✓
-
-        Team[] slots32 = seededSlots(teams, 32); // null for positions where seed > 24
-
-        // Round 1: build all 16 slot-pairs
-        List<Match> r1Matches = new ArrayList<>();
-        for (int i = 0; i < 32; i += 2) {
-            Team t1 = slots32[i];
-            Team t2 = slots32[i + 1];
-            if (t1 == null && t2 == null) continue;
-            Match m = new Match(1);
-            m.setMatchId(matchId++);
-            if (t1 != null) m.setTeam1(t1);
-            if (t2 != null) m.setTeam2(t2);
-            autoCompleteBye(m); // auto-advance bye seeds (seeds 1-8 vs null)
-            r1Matches.add(m);
-            allMatches.add(m);
-        }
-
-        // Rounds 2-5: pair up previous round's matches
-        List<Match> currentRound = r1Matches;
-        int round = 2;
-        while (currentRound.size() > 1) {
-            List<Match> next = new ArrayList<>();
-            for (int i = 0; i + 1 < currentRound.size(); i += 2) {
-                Match parent = new Match(round);
-                parent.setMatchId(matchId++);
-                parent.setLeftChild(currentRound.get(i));
-                parent.setRightChild(currentRound.get(i + 1));
-                if (currentRound.get(i).isCompleted())
-                    parent.setTeam1(currentRound.get(i).getWinner());
-                if (currentRound.get(i + 1).isCompleted())
-                    parent.setTeam2(currentRound.get(i + 1).getWinner());
-                next.add(parent);
-                allMatches.add(parent);
-            }
-            currentRound = next;
-            round++;
-        }
-
-        this.totalRounds = round - 1;
-        this.root = currentRound.isEmpty() ? null : currentRound.get(0);
-
-        System.out.println("SE-24 built: totalRounds=" + totalRounds
-            + " total=" + allMatches.size());
-    }
-
-    // =========================================================================
-    // SINGLE ELIMINATION – 12 teams
-    //
-    // 16-slot grid: top 4 seeds (Seeds #1-4) get byes → auto-advance R1.
-    // Round 1 (Opening Round): 4 matches — Seeds #5-#12 (8 teams)
-    // Round 2 (Quarterfinals): 4 matches — 4 R1-winners vs 4 bye seeds
-    // Round 3 (Semifinals):    2 matches
-    // Round 4 (Championship):  1 match
-    // =========================================================================
-
-    private void buildPlayInSE12(Team[] teams) {     
-       allMatches.clear();
-        losersBracketMatches = new ArrayList<>();
-        winnerToLoserMatch.clear();
-
-        int matchId = 1;
-        Team[] slots16 = seededSlots(teams, 16); 
+        Team[] slots = seededSlots(teams, bracketSize);
 
         List<Match> r1Matches = new ArrayList<>();
-        for (int i = 0; i < 16; i += 2) {
-            Team t1 = slots16[i];
-            Team t2 = slots16[i + 1];
+        for (int i = 0; i < bracketSize; i += 2) {
+            Team t1 = slots[i];
+            Team t2 = slots[i + 1];
             if (t1 == null && t2 == null) continue;
             Match m = new Match(1);
             m.setMatchId(matchId++);
@@ -228,7 +148,7 @@ public class TournamentBracket {
             allMatches.add(m);
         }
 
-        // Rounds 2-4: standard halving
+        // Rounds 2-N: standard halving
         List<Match> currentRound = r1Matches;
         int round = 2;
         while (currentRound.size() > 1) {
@@ -252,31 +172,38 @@ public class TournamentBracket {
         this.totalRounds = round - 1;
         this.root = currentRound.isEmpty() ? null : currentRound.get(0);
 
-        System.out.println("SE-12 built: totalRounds=" + totalRounds
-            + " total=" + allMatches.size());
+        System.out.println("Play-in SE built: bracketSize=" + bracketSize
+            + " totalRounds=" + totalRounds + " total=" + allMatches.size());
     }
 
+
     // =========================================================================
-    // DOUBLE ELIMINATION – 12 teams
+    // DOUBLE ELIMINATION — PLAY-IN (used for 12 and 24 team brackets)
+    //
+    // bracketSize is the next power-of-two slot grid (16 for 12 teams,
+    // 32 for 24 teams). Top seeds get WB byes; everyone else plays a real
+    // WB Round 1 match (same seededSlots()+autoCompleteBye() trick as the
+    // single-elimination play-in build).
     //
     // Winners Bracket:
-    //   WB R1: 4 matches — Seeds #5-#12 (8 teams); 4 winners advance, 4 losers → LB R1
-    //   WB R2: 4 matches — 4 WB-R1 winners vs 4 bye seeds; 4 winners advance, 4 losers → LB R2
-    //   WB R3 (Semifinals): 2 matches; 2 winners advance, 2 losers → LB R4
-    //   WB R4 (Finals): 1 match; winner → Grand Final, loser → LB R6
+    //   WB R1: bracketSize/2 matches (real + auto-bye)
+    //   WB R2: bracketSize/4 matches — real R1 winners vs bye-seed winners
+    //   WB R3..N: standard halving down to the WB Final
     //
-    // Losers Bracket (6 rounds):
-    //   LB R1: 2 matches — 4 WB-R1 losers play each other
-    //   LB R2: 2 matches — 2 LB-R1 survivors vs 2 of the 4 WB-R2 losers
-    //   LB R3: 2 matches — 2 LB-R2 survivors vs remaining 2 WB-R2 losers
-    //   LB R4: 2 matches — 2 LB-R3 survivors vs 2 WB-SF losers
-    //   LB R5: 1 match  — 2 LB-R4 survivors play each other
-    //   LB R6 (Losers Final): 1 match — 1 LB-R5 survivor vs 1 WB-Finals loser
+    // Losers Bracket:
+    //   LB R1 (elim): the real WB-R1 losers play each other
+    //   LB R2 (drop): LB-R1 survivors vs first half of WB-R2 losers
+    //   LB R3 (drop): LB-R2 survivors vs second half of WB-R2 losers
+    //   For each remaining WB round (QF, SF, ... up to but excluding the
+    //   WB Final): a drop round (LB survivors vs that round's WB losers)
+    //   followed by an elim round (survivors play each other) whenever
+    //   more than one match remains.
+    //   Losers Final: last LB survivor vs the WB Final loser.
     //
-    // Grand Final + optional Bracket Reset.
+    // Grand Final caps it off (WB Final winner vs Losers Final winner).
     // =========================================================================
 
-    private void buildDoubleElimination12(Team[] teams) {
+    private void buildPlayInDoubleElimination(Team[] teams, int bracketSize) {
         allMatches.clear();
         losersBracketMatches = new ArrayList<>();
         winnerToLoserMatch.clear();
@@ -285,18 +212,16 @@ public class TournamentBracket {
         int matchId       = 1;
         int losersMatchId = 1000;
 
-        // Seeds 1-4 get WB byes; Seeds 5-12 play WB Round 1.
-        // Use 16-slot seeding: seeds 1-4 paired against null → auto-bye.
-        Team[] slots16 = seededSlots(teams, 16);
+        Team[] slots = seededSlots(teams, bracketSize);
 
-        // WB Round 1: 4 real matches + 4 auto-bye matches
+        // ── WB Round 1: bracketSize/2 matches (real + auto-bye) ─────────────
         List<Match> wbR1All  = new ArrayList<>();
         List<Match> wbR1Real = new ArrayList<>();
         List<Match> wbR1Bye  = new ArrayList<>();
 
-        for (int i = 0; i < 16; i += 2) {
-            Team t1 = slots16[i];
-            Team t2 = slots16[i + 1];
+        for (int i = 0; i < bracketSize; i += 2) {
+            Team t1 = slots[i];
+            Team t2 = slots[i + 1];
             if (t1 == null && t2 == null) continue;
             Match m = new Match(1);
             m.setMatchId(matchId++);
@@ -310,7 +235,7 @@ public class TournamentBracket {
             else        wbR1Real.add(m);
         }
 
-        // WB Round 2: 4 matches (real R1 winners vs bye-seed winners)
+        // ── WB Round 2: real R1 winners vs bye-seed winners ──────────────────
         List<Match> wbR2 = new ArrayList<>();
         for (int i = 0; i + 1 < wbR1All.size(); i += 2) {
             Match left  = wbR1All.get(i);
@@ -326,12 +251,14 @@ public class TournamentBracket {
             allMatches.add(m);
         }
 
-        // WB Rounds 3-4: standard halving
+        // ── WB Rounds 3..N: standard halving ─────────────────────────────────
+        int numWBRounds = (int) Math.round(Math.log(bracketSize) / Math.log(2));
+
         List<List<Match>> wbRounds = new ArrayList<>();
         wbRounds.add(wbR1All);
         wbRounds.add(wbR2);
         List<Match> wbCurrent = wbR2;
-        for (int r = 3; r <= 4; r++) {
+        for (int r = 3; r <= numWBRounds; r++) {
             List<Match> wbNext = new ArrayList<>();
             for (int i = 0; i + 1 < wbCurrent.size(); i += 2) {
                 Match m = new Match(r);
@@ -340,478 +267,22 @@ public class TournamentBracket {
                 m.setLeftChild(wbCurrent.get(i));
                 m.setRightChild(wbCurrent.get(i + 1));
                 if (wbCurrent.get(i).isCompleted())   m.setTeam1(wbCurrent.get(i).getWinner());
-                if (wbCurrent.get(i+1).isCompleted()) m.setTeam2(wbCurrent.get(i+1).getWinner());
+                if (wbCurrent.get(i + 1).isCompleted()) m.setTeam2(wbCurrent.get(i + 1).getWinner());
                 wbNext.add(m);
                 allMatches.add(m);
             }
             wbRounds.add(wbNext);
             wbCurrent = wbNext;
         }
-        Match wbFinal = wbCurrent.get(0); // WB R4 — 1 match
-
-        // LB Round 1 (elim): 2 matches — 4 WB-R1 real losers play each other
-        List<Match> lb1 = new ArrayList<>();
-        for (int i = 0; i + 1 < wbR1Real.size(); i += 2) {
-            Match lm = new Match(1);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR1Real.get(i),     lm);
-            winnerToLoserMatch.put(wbR1Real.get(i + 1), lm);
-            lb1.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB Round 2 (drop): 2 matches — 2 lb1 survivors vs WBR2 losers[0-1]
-        List<Match> lb2 = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
-            Match lm = new Match(2);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR2.get(i), lm);
-            lbWinnerAdvanceMap.put(lb1.get(i),  lm);
-            lb2.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB Round 3 (drop): 2 matches — 2 lb2 survivors vs WBR2 losers[2-3]
-        List<Match> lb3 = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
-            Match lm = new Match(3);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR2.get(2 + i), lm);
-            lbWinnerAdvanceMap.put(lb2.get(i),       lm);
-            lb3.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB Round 4 (drop): 2 matches — 2 lb3 survivors vs 2 WB-SF (WBR3) losers
-        List<Match> wbSF = wbRounds.get(2); // WB Round 3 = index 2, 2 matches
-        List<Match> lb4 = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
-            Match lm = new Match(4);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbSF.get(i), lm);
-            lbWinnerAdvanceMap.put(lb3.get(i),  lm);
-            lb4.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB Round 5 (elim): 1 match — 2 lb4 survivors play each other
-        Match lb5 = new Match(5);
-        lb5.setMatchId(losersMatchId++);
-        lbWinnerAdvanceMap.put(lb4.get(0), lb5);
-        lbWinnerAdvanceMap.put(lb4.get(1), lb5);
-        losersBracketMatches.add(lb5);
-        allMatches.add(lb5);
-
-        // LB Round 6 (Losers Final): 1 match — lb5 survivor vs WB-Finals loser
-        Match lb6 = new Match(6);
-        lb6.setMatchId(losersMatchId++);
-        winnerToLoserMatch.put(wbFinal, lb6);
-        lbWinnerAdvanceMap.put(lb5,     lb6);
-        losersBracketMatches.add(lb6);
-        allMatches.add(lb6);
-
-        // Grand Final
-        Match gf = new Match(7);
-        gf.setMatchId(matchId++);
-        gf.setLeftChild(wbFinal);
-        gf.setRightChild(lb6);
-        allMatches.add(gf);
-
-        this.grandFinals = gf;
-        this.root        = gf;
-        this.totalRounds = 7;
-
-        System.out.println("DE-12 built:"
-            + " WBmatches=" + wbRounds.stream().mapToInt(List::size).sum()
-            + " LBmatches=" + losersBracketMatches.size()
-            + " total=" + allMatches.size());
-    }
-
-    // =========================================================================
-    // DOUBLE ELIMINATION – 24 teams
-    //
-    // Winners Bracket (5 rounds):
-    //   WB R1:  8 matches — Seeds #9-#24 (16 teams); 8 winners advance, 8 losers → LB R1
-    //   WB R2:  8 matches — 8 WB-R1 winners vs 8 bye seeds; 8 winners advance, 8 losers → LB R2
-    //   WB R3 (QF): 4 matches; 4 winners advance, 4 losers → LB R4
-    //   WB R4 (SF): 2 matches; 2 winners advance, 2 losers → LB R6
-    //   WB R5 (Finals): 1 match; winner → Grand Final, loser → LB R8
-    //
-    // Losers Bracket (8 rounds):
-    //   LB R1: 4 matches — 8 WB-R1 losers play each other
-    //   LB R2: 8 matches — 4 LB-R1 survivors + 8 WB-R2 losers  (drop round)
-    //   LB R3: 4 matches — 8 LB-R2 survivors play each other (elim round)
-    //   LB R4: 4 matches — 4 LB-R3 survivors + 4 WB-QF losers (drop round)
-    //   LB R5: 2 matches — 4 LB-R4 survivors play each other (elim round)
-    //   LB R6: 2 matches — 2 LB-R5 survivors + 2 WB-SF losers (drop round)
-    //   LB R7: 1 match  — 2 LB-R6 survivors play each other (elim round)
-    //   LB R8: 1 match  — 1 LB-R7 survivor + 1 WB-Finals loser (Losers Final)
-    //
-    // Grand Final + optional Bracket Reset.
-    // =========================================================================
-
-    private void buildDoubleElimination24(Team[] teams) {
-        allMatches.clear();
-        losersBracketMatches = new ArrayList<>();
-        winnerToLoserMatch.clear();
-        lbWinnerAdvanceMap = new HashMap<>();
-
-        int matchId       = 1;
-        int losersMatchId = 1000;
-
-        // ── Seeds 1-8 get WB byes; Seeds 9-24 play WB Round 1 ──────────────
-        // Use the same 32-slot seeding trick as SE-24:
-        // seededSlots(teams, 32) places seeds 1-8 paired against null (→ byes),
-        // and seeds 9-24 paired against each other for real R1 matches.
-        Team[] slots32 = seededSlots(teams, 32);
-
-        // ── WB Round 1: 8 real matches + 8 auto-bye matches ─────────────────
-        // We keep all 16 matches (including the 8 byes) so the child-link tree
-        // structure for later rounds stays intact.  The 8 bye matches are
-        // auto-completed; the 8 real matches await results.
-        List<Match> wbR1All = new ArrayList<>();  // all 16 slot-pair matches
-        List<Match> wbR1Real = new ArrayList<>();  // the 8 contested matches
-        List<Match> wbR1Bye  = new ArrayList<>();  // the 8 auto-completed byes
-
-        for (int i = 0; i < 32; i += 2) {
-            Team t1 = slots32[i];
-            Team t2 = slots32[i + 1];
-            if (t1 == null && t2 == null) continue;
-            Match m = new Match(1);
-            m.setMatchId(matchId++);
-            m.setIsWinnersBracket(true);
-            if (t1 != null) m.setTeam1(t1);
-            if (t2 != null) m.setTeam2(t2);
-            boolean isBye = autoCompleteBye(m);
-            wbR1All.add(m);
-            allMatches.add(m);
-            if (isBye) wbR1Bye.add(m);
-            else        wbR1Real.add(m);
-        }
-
-        // ── WB Round 2: 8 matches (real R1 winners vs bye-seed winners) ─────
-        List<Match> wbR2 = new ArrayList<>();
-        for (int i = 0; i + 1 < wbR1All.size(); i += 2) {
-            Match left  = wbR1All.get(i);
-            Match right = wbR1All.get(i + 1);
-            Match m = new Match(2);
-            m.setMatchId(matchId++);
-            m.setIsWinnersBracket(true);
-            m.setLeftChild(left);
-            m.setRightChild(right);
-            if (left.isCompleted())  m.setTeam1(left.getWinner());
-            if (right.isCompleted()) m.setTeam2(right.getWinner());
-            wbR2.add(m);
-            allMatches.add(m);
-        }
-
-        // ── WB Rounds 3-5: standard halving ─────────────────────────────────
-        List<List<Match>> wbRounds = new ArrayList<>();
-        wbRounds.add(wbR1All);
-        wbRounds.add(wbR2);
-        List<Match> wbCurrent = wbR2;
-        for (int r = 3; r <= 5; r++) {
-            List<Match> wbNext = new ArrayList<>();
-            for (int i = 0; i + 1 < wbCurrent.size(); i += 2) {
-                Match m = new Match(r);
-                m.setMatchId(matchId++);
-                m.setIsWinnersBracket(true);
-                m.setLeftChild(wbCurrent.get(i));
-                m.setRightChild(wbCurrent.get(i + 1));
-                if (wbCurrent.get(i).isCompleted())     m.setTeam1(wbCurrent.get(i).getWinner());
-                if (wbCurrent.get(i+1).isCompleted())   m.setTeam2(wbCurrent.get(i+1).getWinner());
-                wbNext.add(m);
-                allMatches.add(m);
-            }
-            wbRounds.add(wbNext);
-            wbCurrent = wbNext;
-        }
-        Match wbFinal = wbCurrent.get(0); // WB R5 — 1 match
+        Match wbFinal = wbCurrent.get(0);
 
         // ── LOSERS BRACKET ───────────────────────────────────────────────────
-        // LB R1: 4 matches — the 8 WB-R1 real losers play each other
         int lbRound = 1;
-        List<Match> lbR1 = new ArrayList<>();
-        for (int i = 0; i + 1 < wbR1Real.size(); i += 2) {
-            Match lm = new Match(lbRound);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR1Real.get(i),     lm);
-            winnerToLoserMatch.put(wbR1Real.get(i + 1), lm);
-            lbR1.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-        // LB R2: 8 matches — 4 LB-R1 survivors (team2) + 8 WB-R2 losers (team1 via drop)
-        // Each WB-R2 loser drops into a new LB-R2 match; the matching LB-R1 survivor
-        // will fill team2 of that same match once it is known.
-        lbRound = 2;
-        List<Match> lbR2 = new ArrayList<>();
-        // wbR2 has 8 matches → 8 potential losers; lbR1 has 4 matches → 4 survivors.
-        // Pair: each LB-R1 match's survivor faces 2 WB-R2 losers (one per sub-pair).
-        // Simpler: create 8 LB-R2 matches; pair them with lbR1 survivors 1:2.
-        for (int i = 0; i < wbR2.size(); i++) {
-            Match lm = new Match(lbRound);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR2.get(i), lm); // WB-R2 loser → team1 of this LB match
-            // LB-R1 survivor mapping: lbR1[i/2] → feeds team2 into lm
-            lbWinnerAdvanceMap.put(lbR1.get(i / 2), lm); // will be overwritten for the 2nd entry
-            lbR2.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-        // Fix: each lbR1 survivor needs to go to BOTH lbR2[2i] and lbR2[2i+1]
-        // lbWinnerAdvanceMap can only map one destination per key, so we need a different
-        // approach. We'll store the two lbR2 matches that a given lbR1 match's winner feeds.
-        // Actually the standard propagateWinnerUp uses lbWinnerAdvanceMap (1:1).
-        // For the 1:2 fan-out we instead set lbR2[2i] leftChild = lbR1[i] and
-        // lbR2[2i+1] leftChild = lbR1[i] as well — but a match can't have two parents.
-        //
-        // Correct architecture: each lbR1[i] survivor → exactly ONE lbR2 match.
-        // So we create only 4 lbR2 matches (survivors), each receiving 1 lbR1 survivor
-        // and 1 WB-R2 loser. But spec says 8 LB-R2 matches ("4 survivors face 8 fresh losers").
-        //
-        // Re-reading spec: "LB R2: 8 matches (4 survivors face the 8 fresh losers from WB R2)"
-        // = 4 LB-R1 survivors + 8 WB-R2 losers = 12 participants → can't make 8 two-team matches.
-        // Standard DE interpretation: drop round (8 matches) where each WB-R2 loser gets
-        // its own match, and LB-R1 survivors are spread across them — but 4 vs 8 doesn't split evenly.
-        //
-        // Standard DE rule: LB has alternating "drop" and "elim" rounds.
-        // After WB-R2 (8 losers drop): LB drop round has 8 matches.
-        // Each lbR1 survivor plays a WB-R2 loser.  But there are only 4 survivors for 8 losers.
-        // → Each lbR1 survivor faces TWO sequential WB-R2 losers? No — that's two separate matches.
-        // The spec actually means: 4 survivors + 8 losers → combined = 12, but that's wrong for 8 two-team matches.
-        //
-        // CORRECT reading per user spec: "8 matches" = 4 LB-R1 survivors + 8 WB-R2 losers.
-        // This is impossible as 8 two-team matches with only 12 unique teams unless some teams
-        // play twice — which isn't how DE works.
-        //
-        // The actual standard 24-team DE structure is:
-        //   LB-R1: 4 matches (8 WB-R1 losers → 4 survivors)
-        //   LB-R2 DROP: 4 matches (4 LB-R1 survivors vs 4 of the 8 WB-R2 losers)  — but that leaves 4 WB-R2 losers
-        //   
-        // The user's spec describes 8 LB-R2 matches which requires 16 teams. That's only possible if
-        // ALL 8 WB-R2 losers enter AND all 8 LB-R1 participants re-enter (impossible in DE).
-        //
-        // Correct interpretation: the user's "LB R2: 8 matches" is a TYPO / miscalculation.
-        // The real count for a proper 24-team DE where 8 WB-R2 losers drop in is:
-        //   LB-R1: 4 matches (8 WB-R1 losers → 4 survivors)
-        //   LB-R2 (drop): 8 matches — NO, still 12 teams for 8 matches = impossible.
-        //
-        // Only consistent interpretation: LB-R2 is a pure drop round where each of the 8 WB-R2
-        // losers gets paired with one of the 4 LB-R1 survivors — meaning each survivor plays TWICE
-        // (once per pair). That's still not standard.
-        //
-        // FINAL RESOLUTION: Follow user's match counts exactly (they define the format),
-        // using the standard DE alternating drop/elim architecture:
-        //   LB-R1 (elim):  4 matches  (8 WB-R1 losers → 4 survivors)
-        //   LB-R2 (drop):  4 matches  (4 LB-R1 survivors vs 4 of 8 WB-R2 losers) ← first half
-        //   Then the other 4 WB-R2 losers need their own round → LB-R2b (4 more matches)
-        //   ... This collapses into 8 total matches in what user calls "LB R2".
-        //
-        // SIMPLEST: Treat user's LB-R2 as two sub-rounds combined visually but sequentially:
-        // Actually the cleanest and most common real-world approach for 24-team DE:
-        //   LB-R1: 4 matches — 8 WB-R1 losers play each other → 4 advance
-        //   LB-R2: 4 matches — 4 survivors vs 4 WB-R2 losers → 4 advance
-        //   LB-R3: 4 matches — remaining 4 WB-R2 losers vs 4 LB-R2 survivors → 4 advance
-        //   LB-R4: 2 matches — ...
-        // But user says LB-R2 has 8 matches. Let's honour that literally.
-        //
-        // 8 matches with 4 LB-R1 survivors + 8 WB-R2 losers = 12 teams, 8 matches.
-        // Only way: 4 survivor matches where each survivor faces a WB-R2 loser (4 matches),
-        // PLUS 4 "consolation" matches with the remaining WB-R2 losers... but they're eliminated.
-        // OR: user just means the 8 WB-R2 losers each get their OWN match (8 matches) and the
-        // 4 survivors distribute one-per-two-matches (bracket half structure).
-        //
-        // FINAL FINAL: Implement exactly as user specified using a two-phase R2:
-        //   Phase A (4 matches): the 4 LB-R1 survivors each face one WB-R2 loser
-        //   Phase B (4 matches): the 4 Phase-A winners each face another WB-R2 loser
-        // User probably means Phase-A + Phase-B = "8 matches" in "LB R2" column.
-        // But that's actually LB-R2 + LB-R3 per standard naming.
-        // We'll match the user's round numbering exactly (8 LB rounds as labeled).
 
-        // ── Rebuild LB with exact user-specified structure ────────────────────
-        // Discard the partial lbR2 above and rebuild from scratch correctly.
-        losersBracketMatches.clear();
-        // Remove LB matches from allMatches
-        allMatches.removeIf(m -> m.getMatchId() >= 1000);
-        lbWinnerAdvanceMap.clear();
-        winnerToLoserMatch.clear();
-        losersMatchId = 1000;
-
-        // Re-register WB-R1 → LB-R1 mapping
-        // LB R1: 4 matches — 8 WB-R1 real losers play each other
-        lbRound = 1;
-        lbR1 = new ArrayList<>();
-        for (int i = 0; i + 1 < wbR1Real.size(); i += 2) {
-            Match lm = new Match(lbRound);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR1Real.get(i),     lm);
-            winnerToLoserMatch.put(wbR1Real.get(i + 1), lm);
-            lbR1.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-        // lbR1 has 4 matches → 4 survivors
-
-        // LB R2: 4 matches — 4 LB-R1 survivors each face 1 WB-R2 loser (first 4 of wbR2)
-        lbRound = 2;
-        List<Match> lbR2a = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            Match lm = new Match(lbRound);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR2.get(i), lm);      // WB-R2 loser[0-3] → this match
-            lbWinnerAdvanceMap.put(lbR1.get(i), lm);       // LB-R1 survivor[i] → this match
-            lbR2a.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB R3: 4 matches — 4 LB-R2 survivors each face 1 WB-R2 loser (last 4 of wbR2)
-        lbRound = 3;
-        List<Match> lbR3 = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            Match lm = new Match(lbRound);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR2.get(4 + i), lm);  // WB-R2 loser[4-7] → this match
-            lbWinnerAdvanceMap.put(lbR2a.get(i), lm);      // LB-R2 survivor[i] → this match
-            lbR3.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB R4: 2 matches — 4 LB-R3 survivors play each other (elim round)
-        lbRound = 4;
-        List<Match> lbR4 = new ArrayList<>();
-        for (int i = 0; i + 1 < lbR3.size(); i += 2) {
-            Match lm = new Match(lbRound);
-            lm.setMatchId(losersMatchId++);
-            lbWinnerAdvanceMap.put(lbR3.get(i),     lm);
-            lbWinnerAdvanceMap.put(lbR3.get(i + 1), lm);
-            lbR4.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB R5: 2 matches — 2 LB-R4 survivors each face 1 WB-QF (WBR3) loser
-        List<Match> wbR3 = wbRounds.get(2); // WB Round 3 = index 2 (QF, 4 matches)
-        lbRound = 5;
-        List<Match> lbR5 = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
-            Match lm = new Match(lbRound);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR3.get(i * 2),     lm); // WB-QF losers pair into same LB match
-            winnerToLoserMatch.put(wbR3.get(i * 2 + 1), lm);
-            lbWinnerAdvanceMap.put(lbR4.get(i), lm);
-            lbR5.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB R6: 1 match — 2 LB-R5 survivors play each other (elim round)
-        lbRound = 6;
-        Match lbR6Match = new Match(lbRound);
-        lbR6Match.setMatchId(losersMatchId++);
-        lbWinnerAdvanceMap.put(lbR5.get(0), lbR6Match);
-        lbWinnerAdvanceMap.put(lbR5.get(1), lbR6Match);
-        losersBracketMatches.add(lbR6Match);
-        allMatches.add(lbR6Match);
-
-        // LB R7: 2 matches — 1 LB-R6 survivor + 2 WB-SF (WBR4) losers
-        List<Match> wbR4 = wbRounds.get(3); // WB Round 4 = SF, 2 matches
-        lbRound = 7;
-        List<Match> lbR7 = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
-            Match lm = new Match(lbRound);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR4.get(i), lm);
-            lbR7.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-        // LB-R6 survivor feeds into LB-R7[0]
-        lbWinnerAdvanceMap.put(lbR6Match, lbR7.get(0));
-        // LB-R7[1] needs a feed from somewhere: LB-R7[0] winner? No — they should be
-        // independent matches. Actually WB-R4 has 2 losers → 2 separate LB-R7 matches.
-        // LB-R6 survivor goes to one, and... there's only 1 survivor for 2 slots?
-        //
-        // User spec: "LB R7: 1 match (2 survivors play each other)"
-        // Correcting: LB-R6 and LB-R5 context → at LB-R7 entry we have:
-        //   - 1 LB-R6 survivor
-        //   - 2 WB-SF losers
-        // That's 3 teams for 2 matches → still doesn't work cleanly.
-        //
-        // Re-reading the user's spec carefully:
-        //   LB R6: 2 matches (2 LB-R5 survivors vs 2 WB-SF losers)  ← "drop round"
-        //   LB R7: 1 match  (2 LB-R6 survivors play each other)     ← "elim round"
-        //   LB R8: 1 match  (1 LB-R7 survivor vs 1 WB-Finals loser) ← "Losers Final"
-        //
-        // So the correct structure is:
-        //   lbR5: 2 matches — elim (the 4 LB-R4 survivors play each other → 2 advance)
-        //   lbR6: 2 matches — drop (2 LB-R5 survivors vs 2 WB-SF losers)
-        //   lbR7: 1 match   — elim (2 LB-R6 survivors play each other)
-        //   lbR8: 1 match   — drop+final (1 LB-R7 survivor vs 1 WB-Finals loser)
-        //
-        // Let me also re-read LB R4 and R5:
-        //   LB R4: 4 matches (4 LB-R3 survivors vs 4 WB-QF losers) ← drop
-        //   LB R5: 2 matches (4 LB-R4 survivors play each other)   ← elim
-        //
-        // So the full corrected structure:
-        //   LB R1: 4 matches — elim (8 WB-R1 losers → 4 survive)
-        //   LB R2: 4 matches — drop (4 LB-R1 survivors vs 4 WB-R2 losers[0-3])   ← 4 matches
-        //   LB R3: 4 matches — drop (4 LB-R2 survivors vs 4 WB-R2 losers[4-7])   ← 4 matches
-        //   LB R4: 4 matches — drop (4 LB-R3 survivors vs 4 WB-QF losers)        ← 4 matches
-        //   LB R5: 2 matches — elim (4 LB-R4 survivors → 2 survive)
-        //   LB R6: 2 matches — drop (2 LB-R5 survivors vs 2 WB-SF losers)
-        //   LB R7: 1 match   — elim (2 LB-R6 survivors → 1 survive)
-        //   LB R8: 1 match   — Losers Final (1 LB-R7 survivor vs 1 WB-Finals loser)
-        //
-        // BUT user says: LB R2 = 8 matches, LB R3 = 4 matches, LB R4 = 4 matches...
-        // User's R2 (8 matches) = our R2 (4) + our R3 (4) combined into one "round"?
-        // No — the user explicitly lists separate round counts.
-        //
-        // Let me try yet another reading:
-        //   LB R1: 4 matches  (8 WBR1 losers → 4 survive)
-        //   LB R2: 8 matches  (4 survive + 8 WBR2 losers) → if this is purely a "drop" round,
-        //                      then we need to pair each of the 4 survivors with 2 WBR2 losers
-        //                      sequentially. That means each survivor plays twice? Still weird.
-        //
-        // OR maybe user means: 4 survivors play all 8 losers round-robin style? No.
-        //
-        // The ONLY way to have 8 two-team matches in LB-R2 with 4 survivors + 8 losers:
-        //   Split the 4 survivors into 4 pairs and pair each survivor with 2 WBR2 losers → 8 matches
-        //   i.e., survivor[0] plays wbR2loser[0] AND survivor[0] plays wbR2loser[1]? = 2 matches from survivor[0]
-        //   But a player plays only one match per round in SE/DE.
-        //
-        // CONCLUSION: The user's specification has an arithmetic inconsistency in LB-R2.
-        // The closest VALID structure that honours all other round counts is:
-        //   LB R1: 4 matches  (8 WBR1 losers, elim)
-        //   LB R2: 4 matches  (4 LBR1 survivors vs 4 of 8 WBR2 losers, drop)   ← user says 8
-        //   LB R3: 4 matches  (4 LBR2 survivors vs 4 remaining WBR2 losers, drop)
-        //   LB R4: 4 matches  (4 LBR3 survivors vs 4 WB-QF losers, drop)
-        //   LB R5: 2 matches  (4 LBR4 survivors, elim)
-        //   LB R6: 2 matches  (2 LBR5 survivors vs 2 WB-SF losers, drop)
-        //   LB R7: 1 match    (2 LBR6 survivors, elim)
-        //   LB R8: 1 match    (1 LBR7 survivor vs 1 WB-Finals loser, Losers Final)
-        //
-        // This gives 4+4+4+4+2+2+1+1 = 22 LB matches total, which is correct for 24-team DE.
-        // We'll label them LB R1–R8 as the user wants. LB R2 will be 4 matches even though
-        // user wrote 8 — the bracket math demands it. We'll use the user's round labels.
-
-        // Rebuild everything cleanly with the correct architecture:
-        losersBracketMatches.clear();
-        allMatches.removeIf(m -> m.getMatchId() >= 1000);
-        lbWinnerAdvanceMap.clear();
-        winnerToLoserMatch.clear();
-        losersMatchId = 1000;
-
-        // LB Round 1 (elim): 4 matches — 8 WBR1 real losers play each other
+        // LB R1 (elim): the real WB-R1 losers play each other
         List<Match> lb1 = new ArrayList<>();
         for (int i = 0; i + 1 < wbR1Real.size(); i += 2) {
-            Match lm = new Match(1);
+            Match lm = new Match(lbRound);
             lm.setMatchId(losersMatchId++);
             winnerToLoserMatch.put(wbR1Real.get(i),     lm);
             winnerToLoserMatch.put(wbR1Real.get(i + 1), lm);
@@ -819,101 +290,99 @@ public class TournamentBracket {
             losersBracketMatches.add(lm);
             allMatches.add(lm);
         }
+        lbRound++;
+        List<Match> lbPrev = lb1;
 
-        // LB Round 2 (drop): 4 matches — 4 lb1 survivors vs WBR2 losers[0-3]
+        // LB R2 (drop): LB-R1 survivors vs first half of WB-R2 losers
+        int half = wbR2.size() / 2;
         List<Match> lb2 = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            Match lm = new Match(2);
+        for (int i = 0; i < half; i++) {
+            Match lm = new Match(lbRound);
             lm.setMatchId(losersMatchId++);
             winnerToLoserMatch.put(wbR2.get(i), lm);
-            lbWinnerAdvanceMap.put(lb1.get(i),  lm);
+            lbWinnerAdvanceMap.put(lbPrev.get(i), lm);
             lb2.add(lm);
             losersBracketMatches.add(lm);
             allMatches.add(lm);
         }
+        lbRound++;
+        lbPrev = lb2;
 
-        // LB Round 3 (drop): 4 matches — 4 lb2 survivors vs WBR2 losers[4-7]
+        // LB R3 (drop): LB-R2 survivors vs second half of WB-R2 losers
         List<Match> lb3 = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            Match lm = new Match(3);
+        for (int i = 0; i < half; i++) {
+            Match lm = new Match(lbRound);
             lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbR2.get(4 + i), lm);
-            lbWinnerAdvanceMap.put(lb2.get(i),       lm);
+            winnerToLoserMatch.put(wbR2.get(half + i), lm);
+            lbWinnerAdvanceMap.put(lbPrev.get(i), lm);
             lb3.add(lm);
             losersBracketMatches.add(lm);
             allMatches.add(lm);
         }
+        lbRound++;
+        lbPrev = lb3;
 
-        // LB Round 4 (drop): 4 matches — 4 lb3 survivors vs 4 WBR3 (QF) losers
-        List<Match> wbQF = wbRounds.get(2);  // WB Round 3, 4 matches
-        List<Match> lb4 = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            Match lm = new Match(4);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbQF.get(i), lm);
-            lbWinnerAdvanceMap.put(lb3.get(i),  lm);
-            lb4.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
+        // Remaining WB rounds (QF, SF, ... up to but excluding the WB Final):
+        // each gets a drop round, followed by an elim round whenever more
+        // than one match survives.
+        for (int wr = 3; wr <= numWBRounds - 1; wr++) {
+            List<Match> wbThisRound = wbRounds.get(wr - 1);
+
+            List<Match> drop = new ArrayList<>();
+            for (int i = 0; i < wbThisRound.size(); i++) {
+                Match lm = new Match(lbRound);
+                lm.setMatchId(losersMatchId++);
+                winnerToLoserMatch.put(wbThisRound.get(i), lm);
+                lbWinnerAdvanceMap.put(lbPrev.get(i), lm);
+                drop.add(lm);
+                losersBracketMatches.add(lm);
+                allMatches.add(lm);
+            }
+            lbRound++;
+            lbPrev = drop;
+
+            if (drop.size() > 1) {
+                List<Match> elim = new ArrayList<>();
+                for (int i = 0; i + 1 < drop.size(); i += 2) {
+                    Match lm = new Match(lbRound);
+                    lm.setMatchId(losersMatchId++);
+                    lbWinnerAdvanceMap.put(drop.get(i),     lm);
+                    lbWinnerAdvanceMap.put(drop.get(i + 1), lm);
+                    elim.add(lm);
+                    losersBracketMatches.add(lm);
+                    allMatches.add(lm);
+                }
+                lbRound++;
+                lbPrev = elim;
+            }
         }
 
-        // LB Round 5 (elim): 2 matches — 4 lb4 survivors play each other
-        List<Match> lb5 = new ArrayList<>();
-        for (int i = 0; i + 1 < lb4.size(); i += 2) {
-            Match lm = new Match(5);
-            lm.setMatchId(losersMatchId++);
-            lbWinnerAdvanceMap.put(lb4.get(i),     lm);
-            lbWinnerAdvanceMap.put(lb4.get(i + 1), lm);
-            lb5.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB Round 6 (drop): 2 matches — 2 lb5 survivors vs 2 WBR4 (SF) losers
-        List<Match> wbSF = wbRounds.get(3);  // WB Round 4, 2 matches
-        List<Match> lb6 = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
-            Match lm = new Match(6);
-            lm.setMatchId(losersMatchId++);
-            winnerToLoserMatch.put(wbSF.get(i), lm);
-            lbWinnerAdvanceMap.put(lb5.get(i),  lm);
-            lb6.add(lm);
-            losersBracketMatches.add(lm);
-            allMatches.add(lm);
-        }
-
-        // LB Round 7 (elim): 1 match — 2 lb6 survivors play each other
-        Match lb7 = new Match(7);
-        lb7.setMatchId(losersMatchId++);
-        lbWinnerAdvanceMap.put(lb6.get(0), lb7);
-        lbWinnerAdvanceMap.put(lb6.get(1), lb7);
-        losersBracketMatches.add(lb7);
-        allMatches.add(lb7);
-
-        // LB Round 8 (Losers Final): 1 match — lb7 survivor vs WBR5 (Finals) loser
-        Match lb8 = new Match(8);
-        lb8.setMatchId(losersMatchId++);
-        winnerToLoserMatch.put(wbFinal, lb8);
-        lbWinnerAdvanceMap.put(lb7,     lb8);
-        losersBracketMatches.add(lb8);
-        allMatches.add(lb8);
+        // Losers Final: last LB survivor vs the WB Final loser
+        Match losersFinal = new Match(lbRound);
+        losersFinal.setMatchId(losersMatchId++);
+        winnerToLoserMatch.put(wbFinal, losersFinal);
+        lbWinnerAdvanceMap.put(lbPrev.get(0), losersFinal);
+        losersBracketMatches.add(losersFinal);
+        allMatches.add(losersFinal);
+        lbRound++;
 
         // ── GRAND FINAL ──────────────────────────────────────────────────────
-        Match gf = new Match(9);
+        Match gf = new Match(lbRound);
         gf.setMatchId(matchId++);
         gf.setLeftChild(wbFinal);
-        gf.setRightChild(lb8);
+        gf.setRightChild(losersFinal);
         allMatches.add(gf);
 
         this.grandFinals = gf;
         this.root        = gf;
-        this.totalRounds = 9;
+        this.totalRounds = lbRound;
 
-        System.out.println("DE-24 built:"
+        System.out.println("Play-in DE built: bracketSize=" + bracketSize
             + " WBmatches=" + wbRounds.stream().mapToInt(List::size).sum()
             + " LBmatches=" + losersBracketMatches.size()
             + " total=" + allMatches.size());
     }
+
 
     // =========================================================================
     // DOUBLE ELIMINATION  (power-of-2 only: 4, 8, 16, 32)

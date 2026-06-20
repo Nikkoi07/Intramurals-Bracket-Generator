@@ -5,21 +5,29 @@ DESCRIPTION:
 STATUS: PENDING
 TEAMS: 16
 ----------------------------------------
-Team: Daniel | Wins: 0 | Losses: 0
-Team: Juan | Wins: 0 | Losses: 0
-Team: Pikachu | Wins: 0 | Losses: 0
-Team: Risa | Wins: 0 | Losses: 0
-Team: John | Wins: 0 | Losses: 0
-Team: Kiko | Wins: 0 | Losses: 0
-Team: Robin | Wins: 0 | Losses: 0
-Team: Trillanes | Wins: 0 | Losses: 0
-Team: Bato | Wins: 0 | Losses: 0
-Team: Kilo | Wins: 0 | Losses: 0
-Team: Dave | Wins: 0 | Losses: 0
-Team: Jungkook | Wins: 0 | Losses: 0
-Team: Marvin | Wins: 0 | Losses: 0
-Team: Spongebob | Wins: 0 | Losses: 0
-Team: Kuya Kim | Wins: 0 | Losses: 0
-Team: Mark | Wins: 0 | Losses: 0
+Team: Daniel | Wins: 0 | Losses: 1
+Team: Juan | Wins: 0 | Losses: 1
+Team: Pikachu | Wins: 1 | Losses: 0
+Team: Risa | Wins: 1 | Losses: 0
+Team: John | Wins: 0 | Losses: 1
+Team: Kiko | Wins: 1 | Losses: 0
+Team: Robin | Wins: 0 | Losses: 1
+Team: Trillanes | Wins: 1 | Losses: 0
+Team: Bato | Wins: 0 | Losses: 1
+Team: Kilo | Wins: 1 | Losses: 0
+Team: Dave | Wins: 0 | Losses: 1
+Team: Jungkook | Wins: 1 | Losses: 0
+Team: Marvin | Wins: 0 | Losses: 1
+Team: Spongebob | Wins: 0 | Losses: 1
+Team: Kuya Kim | Wins: 1 | Losses: 0
+Team: Mark | Wins: 1 | Losses: 0
 ----------------------------------------
 MATCH RESULTS:
+Match 1: Daniel vs Mark -> Winner: Mark (14-15)
+Match 2: Trillanes vs Bato -> Winner: Trillanes (3-0)
+Match 3: Risa vs Marvin -> Winner: Risa (4-1)
+Match 4: John vs Jungkook -> Winner: Jungkook (6-18)
+Match 5: Juan vs Kuya Kim -> Winner: Kuya Kim (10-18)
+Match 6: Robin vs Kilo -> Winner: Kilo (0-7)
+Match 7: Pikachu vs Spongebob -> Winner: Pikachu (2-1)
+Match 8: Kiko vs Dave -> Winner: Kiko (12-9)
